@@ -1,6 +1,7 @@
 # 📚 Yearbook Angkatan 26 — Pondok Pesantren Wahdah Islamiyah
 
 > Link sementara: https://yearbook-angkatan26-ilam5xv5r.vercel.app/
+
 > **Digital Yearbook** untuk Angkatan ke-26 (XVI) PPWI — Neutrino (Ikhwa) & All Axe (Akhwat) · 2023–2026
 
 ---
