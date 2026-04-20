@@ -14,24 +14,43 @@ const getTimeLeft = (target: Date): TimeLeft => {
   };
 };
 
+const isFinished = (t: TimeLeft) => t.days === 0 && t.hours === 0 && t.minutes === 0 && t.seconds === 0;
+
 // Komponen utama
 const CountdownTimerComponent = ({ targetDate }: { targetDate: Date }) => {
-  // Gunakan state awal null atau objek kosong untuk menghindari perbedaan angka saat hydration
   const [time, setTime] = useState<TimeLeft | null>(null);
 
   useEffect(() => {
-    // Set waktu pertama kali saat sudah di browser
     setTime(getTimeLeft(new Date(targetDate)));
-    
     const id = setInterval(() => {
       setTime(getTimeLeft(new Date(targetDate)));
     }, 1000);
-    
     return () => clearInterval(id);
   }, [targetDate]);
 
-  // Jika belum di-mount (masih proses render server), tampilkan loading atau kosong agar tidak error
   if (!time) return <div className="min-h-[200px]" />;
+
+  // ── Countdown selesai — tampilkan perayaan ──────────────────
+  if (isFinished(time)) {
+    return (
+      <div className="text-center">
+        <div className="text-6xl mb-4 animate-bounce">🎓</div>
+        <h2 className="section-title text-gold mb-2" style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)' }}>
+          Selamat! Kalian Telah Lulus!
+        </h2>
+        <p className="text-cream/70 font-body text-base mb-6">
+          Angkatan 26 — MTs Wahdah Islamiyah Bone Bolango<br />
+          <span className="text-gold">Hari yang kalian tunggu telah tiba! 🎉✨</span>
+        </p>
+        <div className="flex justify-center gap-4 text-4xl animate-pulse">
+          <span>🎊</span><span>⭐</span><span>🌟</span><span>⭐</span><span>🎊</span>
+        </div>
+        <p className="mt-6 font-script text-gold/70 text-xl px-4">
+          &ldquo;Setiap akhir adalah awal yang baru.&rdquo;
+        </p>
+      </div>
+    );
+  }
 
   const units = [
     { label: 'Hari',   value: time.days },
@@ -68,5 +87,4 @@ const CountdownTimerComponent = ({ targetDate }: { targetDate: Date }) => {
   );
 };
 
-// Bungkus dengan dynamic import agar HANYA jalan di browser (Client Side)
 export default dynamic(() => Promise.resolve(CountdownTimerComponent), { ssr: false });

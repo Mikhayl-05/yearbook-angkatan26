@@ -324,6 +324,12 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
     setUploading(false);
   };
 
+  const handleDeletePhoto = async () => {
+    if (!confirm('Hapus foto santri? Foto akan direset ke default.')) return;
+    setForm(f => ({ ...f, foto: '' }));
+    toast.success('Foto dihapus, simpan untuk konfirmasi.');
+  };
+
   return (
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal max-w-lg w-full" onClick={e => e.stopPropagation()}>
@@ -331,15 +337,29 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
           <h3 className="font-display text-cream text-base sm:text-lg font-bold truncate pr-4">Edit: {santri.nama}</h3>
           <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl flex-shrink-0">×</button>
         </div>
-        <div className="space-y-3 sm:space-y-4 max-h-[65vh] overflow-y-auto pr-1 sm:pr-2">
+        <div className="space-y-3 sm:space-y-4 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2">
           <div>
             <label className="section-label text-[10px] block mb-2">Foto Utama</label>
-            <div className="flex items-center gap-3 sm:gap-4">
-              {form.foto ? <img src={form.foto} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-cover border border-gold/20" /> : <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg skeleton" />}
-              <label className={`admin-btn admin-btn-ghost text-xs cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-                {uploading ? '⏳ Uploading...' : '📷 Ganti Foto'}
-                <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} />
-              </label>
+            <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+              {form.foto
+                ? <img src={form.foto} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-cover border border-gold/20 flex-shrink-0" />
+                : <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg skeleton flex-shrink-0 flex items-center justify-center text-cream/20 text-xs">No foto</div>
+              }
+              <div className="flex flex-col gap-2">
+                <label className={`admin-btn admin-btn-ghost text-xs cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
+                  {uploading ? '⏳ Uploading...' : '📷 Ganti Foto'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} />
+                </label>
+                {form.foto && (
+                  <button
+                    type="button"
+                    onClick={handleDeletePhoto}
+                    className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
+                  >
+                    🗑 Hapus Foto
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div>
@@ -764,7 +784,7 @@ function PlaylistTab() {
 function SettingsTab() {
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<string|null>(null);
 
   useEffect(() => {
     supabase.from('site_settings').select('*').then(({data}) => {
@@ -777,7 +797,7 @@ function SettingsTab() {
 
   const handleUploadBg = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if(!file) return;
-    setSaving(true);
+    setSaving(key);
     try {
       const url = await uploadPhoto(file, `settings/${key}_${Date.now()}.${file.name.split('.').pop()}`);
       const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()});
@@ -786,29 +806,83 @@ function SettingsTab() {
       if(key==='allaxe_bg_url') setAllAxeBg(url);
       toast.success('Background diupdate!');
     } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
-    setSaving(false);
+    setSaving(null);
+  };
+
+  const handleResetBg = async (key: string) => {
+    if (!confirm('Reset background ke default? Foto yang diupload akan dihapus dari pengaturan.')) return;
+    setSaving(key + '_reset');
+    try {
+      await supabase.from('site_settings').upsert({key, value:'', updated_at:new Date().toISOString()});
+      if(key==='neutrino_bg_url') setNeutrinoBg('');
+      if(key==='allaxe_bg_url') setAllAxeBg('');
+      toast.success('Background direset ke default!');
+    } catch (err: any) { toast.error('Gagal reset: ' + (err?.message || '')); }
+    setSaving(null);
   };
 
   return (
     <div>
-      <h2 className="font-display text-cream text-xl font-bold mb-6">Pengaturan</h2>
+      <h2 className="font-display text-cream text-xl font-bold mb-2">Pengaturan</h2>
+      <p className="text-cream/40 text-xs font-body mb-8">Kelola tampilan halaman utama</p>
       <div className="space-y-6 max-w-lg">
+        {/* Neutrino BG */}
         <div className="card-dark p-6">
-          <h3 className="text-cream text-sm font-display font-bold mb-2">Background Neutrino</h3>
-          <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino (halaman beranda)</p>
-          {neutrinoBg && <img src={neutrinoBg} className="w-full h-32 object-cover rounded-lg mb-3 border border-gold/20 opacity-70" />}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving?'opacity-50':''}`}>
-            {saving?'⏳ Uploading...':'📷 Upload Background Neutrino'}
-            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('neutrino_bg_url',e)} disabled={saving} />
+          <h3 className="text-cream text-sm font-display font-bold mb-1">Background Neutrino</h3>
+          <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino (halaman beranda). Foto akan ditampilkan dengan opacity rendah + efek fade agar teks tetap terbaca.</p>
+          {neutrinoBg ? (
+            <div className="relative mb-3">
+              <img src={neutrinoBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
+              <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
+              <div className="absolute top-2 right-2">
+                <button
+                  onClick={() => handleResetBg('neutrino_bg_url')}
+                  disabled={saving === 'neutrino_bg_url_reset'}
+                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
+                >
+                  🗑 Reset ke Default
+                </button>
+              </div>
+              <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview (dengan efek fade)</p>
+            </div>
+          ) : (
+            <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
+              <span className="text-cream/30 text-xs">Menggunakan foto default</span>
+            </div>
+          )}
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='neutrino_bg_url'?'opacity-50':''}`}>
+            {saving==='neutrino_bg_url'?'⏳ Uploading...':'📷 Upload Background Neutrino'}
+            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('neutrino_bg_url',e)} disabled={!!saving} />
           </label>
         </div>
+
+        {/* All Axe BG */}
         <div className="card-dark p-6">
-          <h3 className="text-cream text-sm font-display font-bold mb-2">Background All Axe</h3>
-          <p className="text-cream/40 text-xs mb-4">Foto latar di panel All Axe (halaman beranda)</p>
-          {allAxeBg && <img src={allAxeBg} className="w-full h-32 object-cover rounded-lg mb-3 border border-gold/20 opacity-70" />}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving?'opacity-50':''}`}>
-            {saving?'⏳ Uploading...':'📷 Upload Background All Axe'}
-            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('allaxe_bg_url',e)} disabled={saving} />
+          <h3 className="text-cream text-sm font-display font-bold mb-1">Background All Axe</h3>
+          <p className="text-cream/40 text-xs mb-4">Foto latar di panel All Axe (halaman beranda). Foto akan ditampilkan dengan opacity rendah + efek fade.</p>
+          {allAxeBg ? (
+            <div className="relative mb-3">
+              <img src={allAxeBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
+              <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
+              <div className="absolute top-2 right-2">
+                <button
+                  onClick={() => handleResetBg('allaxe_bg_url')}
+                  disabled={saving === 'allaxe_bg_url_reset'}
+                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
+                >
+                  🗑 Reset ke Default
+                </button>
+              </div>
+              <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview (dengan efek fade)</p>
+            </div>
+          ) : (
+            <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
+              <span className="text-cream/30 text-xs">Menggunakan foto default</span>
+            </div>
+          )}
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='allaxe_bg_url'?'opacity-50':''}`}>
+            {saving==='allaxe_bg_url'?'⏳ Uploading...':'📷 Upload Background All Axe'}
+            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('allaxe_bg_url',e)} disabled={!!saving} />
           </label>
         </div>
       </div>
@@ -841,13 +915,18 @@ function UsersTab({ session }: { session: any }) {
   const [makeAdmin, setMakeAdmin] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const getToken = () => session?.access_token || '';
+  const getToken = async (): Promise<string> => {
+    // Refresh session jika perlu
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || session?.access_token || '';
+  };
 
   const fetchUsers = async () => {
     setLoading(true); setError('');
     try {
+      const token = await getToken();
       const res = await fetch('/api/admin/users', {
-        headers: { Authorization: `Bearer ${getToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Gagal memuat'); setLoading(false); return; }
@@ -862,9 +941,10 @@ function UsersTab({ session }: { session: any }) {
     if (!newEmail || !newPassword) { toast.error('Email dan password wajib'); return; }
     setCreating(true);
     try {
+      const token = await getToken();
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ email: newEmail, password: newPassword, full_name: newName, make_admin: makeAdmin }),
       });
       const data = await res.json();
@@ -879,9 +959,10 @@ function UsersTab({ session }: { session: any }) {
   const handleToggleAdmin = async (user: UserRow) => {
     const action = user.is_admin ? 'Cabut akses admin' : 'Jadikan admin';
     if (!confirm(`${action} untuk ${user.email}?`)) return;
+    const token = await getToken();
     const res = await fetch('/api/admin/users', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ email: user.email, make_admin: !user.is_admin }),
     });
     const data = await res.json();
@@ -892,9 +973,10 @@ function UsersTab({ session }: { session: any }) {
 
   const handleDelete = async (user: UserRow) => {
     if (!confirm(`Hapus akun ${user.email}? Tindakan ini tidak bisa dibatalkan!`)) return;
+    const token = await getToken();
     const res = await fetch('/api/admin/users', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ user_id: user.id, email: user.email }),
     });
     const data = await res.json();

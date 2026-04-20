@@ -95,12 +95,12 @@ export default function Navbar() {
             </div>
 
             {/* RIGHT CONTROLS */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
 
               {/* MUSIC TOGGLE BUTTON */}
               <button
                 onClick={() => { setIsMinimized(!isMinimized); }}
-                className="relative flex items-center gap-2 px-3 py-1.5 rounded-full border border-gold/30 hover:border-gold/60 transition-all group"
+                className="relative flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full border border-gold/30 hover:border-gold/60 transition-all group flex-shrink-0"
                 title="Music Player"
               >
                 {/* Equalizer animation */}
@@ -120,7 +120,7 @@ export default function Navbar() {
                   ))}
                 </div>
                 <span className="text-gold/70 group-hover:text-gold text-xs font-heading tracking-wider hidden sm:block">
-                  {isPlaying && currentTrack ? currentTrack.title.slice(0, 14) + '…' : 'Music'}
+                  {isPlaying && currentTrack ? currentTrack.title.slice(0, 12) + '…' : 'Music'}
                 </span>
               </button>
 
@@ -128,7 +128,7 @@ export default function Navbar() {
               {user ? (
                 <div className="flex items-center gap-2">
                   {isAdmin && (
-                    <Link href="/admin" className="text-gold/70 hover:text-gold text-xs font-heading tracking-wider transition-colors">
+                    <Link href="/admin" className="text-gold/70 hover:text-gold text-xs font-heading tracking-wider transition-colors flex items-center h-8">
                       Admin
                     </Link>
                   )}

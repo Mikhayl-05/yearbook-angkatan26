@@ -1,20 +1,14 @@
 // src/context/MusicContext.tsx
 import { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export type Track = {
   id: string;
   title: string;
   artist: string;
-  src: string;        // URL audio
+  src: string;
   cover?: string;
 };
-
-// Playlist default (ganti src dengan URL file di Supabase Storage)
-const DEFAULT_PLAYLIST: Track[] = [
-  { id: '1', title: 'Hampir Lulus', artist: 'Angkatan 26', src: '/audio/track1.mp3' },
-  { id: '2', title: 'Jargon Kelas', artist: 'Neutrino & All Axe', src: '/audio/track2.mp3' },
-  { id: '3', title: 'Kenangan Asrama', artist: 'Angkatan 26', src: '/audio/track3.mp3' },
-];
 
 type MusicContextType = {
   playlist: Track[];
@@ -39,7 +33,7 @@ type MusicContextType = {
 const MusicContext = createContext<MusicContextType>({} as MusicContextType);
 
 export function MusicProvider({ children }: { children: ReactNode }) {
-  const [playlist, setPlaylist] = useState<Track[]>(DEFAULT_PLAYLIST);
+  const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.6);
@@ -48,8 +42,32 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [isMinimized, setIsMinimized] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentTrack = playlist[currentIndex] ?? null;
+  const currentTrack = playlist.length > 0 ? (playlist[currentIndex] ?? null) : null;
 
+  // ── Load playlist dari Supabase DB ─────────────────────────────
+  useEffect(() => {
+    const loadPlaylist = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('playlist')
+          .select('*')
+          .order('order_num', { ascending: true });
+        if (!error && data && data.length > 0) {
+          const tracks: Track[] = data.map((row: any) => ({
+            id: String(row.id),
+            title: row.title || 'Untitled',
+            artist: row.artist || 'Angkatan 26',
+            src: row.url,
+            cover: row.cover_url || undefined,
+          }));
+          setPlaylist(tracks);
+        }
+      } catch { /* silent fail */ }
+    };
+    loadPlaylist();
+  }, []);
+
+  // ── Setup audio element (once) ──────────────────────────────────
   useEffect(() => {
     const audio = new Audio();
     audio.volume = volume;
@@ -57,16 +75,24 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener('timeupdate', () => setProgress(audio.currentTime));
     audio.addEventListener('durationchange', () => setDuration(audio.duration));
-    audio.addEventListener('ended', () => next());
+    audio.addEventListener('ended', () => {
+      setCurrentIndex(i => {
+        const len = audioRef.current ? playlist.length : 1;
+        return (i + 1) % Math.max(1, len);
+      });
+    });
 
     return () => { audio.pause(); audio.src = ''; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── When track changes, update src ─────────────────────────────
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
     audio.src = currentTrack.src;
     if (isPlaying) audio.play().catch(() => setIsPlaying(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, playlist]);
 
   const play = (index?: number) => {
@@ -76,24 +102,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setCurrentIndex(index);
       return;
     }
-    audio.play().then(() => setIsPlaying(true)).catch(() => { });
+    audio.play().then(() => setIsPlaying(true)).catch(() => {});
   };
 
-  const pause = () => {
-    audioRef.current?.pause();
-    setIsPlaying(false);
-  };
-
-  const toggle = () => isPlaying ? pause() : play();
-
-  const next = () => setCurrentIndex(i => (i + 1) % playlist.length);
-  const prev = () => setCurrentIndex(i => (i - 1 + playlist.length) % playlist.length);
+  const pause = () => { audioRef.current?.pause(); setIsPlaying(false); };
+  const toggle = () => (isPlaying ? pause() : play());
+  const next = () => setCurrentIndex(i => (i + 1) % Math.max(1, playlist.length));
+  const prev = () => setCurrentIndex(i => (i - 1 + Math.max(1, playlist.length)) % Math.max(1, playlist.length));
 
   const seek = (time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setProgress(time);
-    }
+    if (audioRef.current) { audioRef.current.currentTime = time; setProgress(time); }
   };
 
   const setVolume = (v: number) => {
