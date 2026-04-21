@@ -2,13 +2,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
-import { supabase, uploadPhoto } from '@/lib/supabase';
-import type { SantriDB, GalleryItem, GallerySubmission, GuruDB, CustomLink } from '@/lib/supabase';
+import { supabase, uploadPhoto, deleteFileFromStorage } from '@/lib/supabase';
+import type { SantriDB, GalleryItem, GallerySubmission, GuruDB, CustomLink, TimelineItem } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import { LINK_GRADIENT_PRESETS } from '@/components/sections/StudentCard';
 
-type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'settings' | 'users';
+type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading, session } = useAuth();
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
     { id: 'submissions', label: 'Pending',      icon: '📤', badge: stats.pending },
     { id: 'notes',       label: 'Quote Wall',   icon: '📌' },
     { id: 'playlist',    label: 'Playlist',     icon: '🎵' },
+    { id: 'timeline',    label: 'Timeline',     icon: '📅' },
     { id: 'settings',    label: 'Pengaturan',   icon: '⚙️' },
     { id: 'users',       label: 'Akun',         icon: '🔐' },
   ];
@@ -101,6 +102,7 @@ export default function AdminDashboard() {
           {tab === 'submissions' && <SubmissionsTab onUpdate={fetchStats} />}
           {tab === 'notes'       && <NotesTab />}
           {tab === 'playlist'    && <PlaylistTab />}
+          {tab === 'timeline'    && <TimelineTab />}
           {tab === 'settings'    && <SettingsTab />}
           {tab === 'users'       && <UsersTab session={session} />}
         </main>
@@ -366,19 +368,23 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
             <label className="section-label text-[10px] block mb-2">Nama</label>
             <input value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} className="admin-input" />
           </div>
+
+          {/* Tempat & Tanggal Lahir */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="section-label text-[10px] block mb-2">Tempat Lahir</label>
+              <label className="section-label text-[10px] block mb-1.5">Tempat Lahir</label>
               <input value={form.tempat_lahir} onChange={e => setForm(f => ({ ...f, tempat_lahir: e.target.value }))} className="admin-input" />
             </div>
             <div>
-              <label className="section-label text-[10px] block mb-2">Tanggal Lahir</label>
+              <label className="section-label text-[10px] block mb-1.5">Tanggal Lahir</label>
               <input type="date" value={form.tanggal_lahir} onChange={e => setForm(f => ({ ...f, tanggal_lahir: e.target.value }))} className="admin-input" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Jabatan & Kelas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="section-label text-[10px] block mb-2">Jabatan</label>
+              <label className="section-label text-[10px] block mb-1.5">Jabatan</label>
               <select value={form.jabatan || 'anggota'} onChange={e => setForm(f => ({ ...f, jabatan: e.target.value }))} className="admin-select">
                 <option value="anggota">Anggota</option>
                 <option value="ketua">Ketua</option>
@@ -387,23 +393,27 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
               </select>
             </div>
             <div>
-              <label className="section-label text-[10px] block mb-2">Kelas</label>
+              <label className="section-label text-[10px] block mb-1.5">Kelas</label>
               <select value={form.kelas} onChange={e => setForm(f => ({ ...f, kelas: e.target.value as any }))} className="admin-select">
                 <option value="neutrino">Neutrino</option>
                 <option value="all-axe">All Axe</option>
               </select>
             </div>
           </div>
+
+          {/* Instagram & WA */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="section-label text-[10px] block mb-2">Instagram (tanpa @)</label>
+              <label className="section-label text-[10px] block mb-1.5">Instagram (tanpa @)</label>
               <input value={form.instagram || ''} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="username" className="admin-input" />
             </div>
             <div>
-              <label className="section-label text-[10px] block mb-2">WhatsApp</label>
+              <label className="section-label text-[10px] block mb-1.5">WhatsApp</label>
               <input value={form.wa || ''} onChange={e => setForm(f => ({ ...f, wa: e.target.value }))} placeholder="08xxx atau +62xxx" className="admin-input" />
             </div>
           </div>
+
+          {/* Custom Links */}
           <CustomLinksEditor links={customLinks} onChange={setCustomLinks} />
           <div>
             <label className="section-label text-[10px] block mb-2">Quote</label>
@@ -1069,8 +1079,8 @@ function UsersTab({ session }: { session: any }) {
           {Array.from({length:5}).map((_,i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gold/15">
-          <table className="admin-table">
+        <div className="overflow-x-auto rounded-xl border border-gold/15 w-full">
+          <table className="admin-table w-full min-w-[700px]">
             <thead>
               <tr>
                 <th>Email</th><th>Nama</th><th>Status</th><th>Login Terakhir</th><th>Aksi</th>
