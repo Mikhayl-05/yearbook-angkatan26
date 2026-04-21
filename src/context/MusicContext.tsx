@@ -20,6 +20,7 @@ type MusicContextType = {
   duration: number;
   isMinimized: boolean;
   setIsMinimized: (v: boolean) => void;
+  isReady: boolean;
   play: (index?: number) => void;
   pause: () => void;
   toggle: () => void;
@@ -40,9 +41,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMinimized, setIsMinimized] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playlistRef = useRef<Track[]>([]);
 
   const currentTrack = playlist.length > 0 ? (playlist[currentIndex] ?? null) : null;
+
+  // sync ref
+  useEffect(() => {
+    playlistRef.current = playlist;
+  }, [playlist]);
 
   // ── Load playlist dari Supabase DB ─────────────────────────────
   useEffect(() => {
@@ -61,8 +69,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             cover: row.cover_url || undefined,
           }));
           setPlaylist(tracks);
+        } else {
+          setIsReady(true); // Nothing to play or error, so unlock screen
         }
-      } catch { /* silent fail */ }
+      } catch { setIsReady(true); /* silent fail */ }
     };
     loadPlaylist();
   }, []);
@@ -75,10 +85,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener('timeupdate', () => setProgress(audio.currentTime));
     audio.addEventListener('durationchange', () => setDuration(audio.duration));
+    audio.addEventListener('canplaythrough', () => setIsReady(true));
+    audio.addEventListener('error', () => setIsReady(true)); // don't block user if loading fails
     audio.addEventListener('ended', () => {
       setCurrentIndex(i => {
-        const len = audioRef.current ? playlist.length : 1;
-        return (i + 1) % Math.max(1, len);
+        const len = playlistRef.current.length || 1;
+        return (i + 1) % len;
       });
     });
 
@@ -122,7 +134,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   return (
     <MusicContext.Provider value={{
       playlist, currentTrack, currentIndex, isPlaying,
-      volume, progress, duration, isMinimized, setIsMinimized,
+      volume, progress, duration, isMinimized, setIsMinimized, isReady,
       play, pause, toggle, next, prev, seek, setVolume, setPlaylist,
     }}>
       {children}

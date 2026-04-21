@@ -800,6 +800,7 @@ function PlaylistTab() {
 function SettingsTab() {
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
+  const [ogBg, setOgBg] = useState('');
   const [saving, setSaving] = useState<string|null>(null);
 
   useEffect(() => {
@@ -807,6 +808,7 @@ function SettingsTab() {
       if(data) data.forEach((s:{key:string;value:string}) => {
         if(s.key==='neutrino_bg_url') setNeutrinoBg(s.value||'');
         if(s.key==='allaxe_bg_url') setAllAxeBg(s.value||'');
+        if(s.key==='og_image_url') setOgBg(s.value||'');
       });
     });
   }, []);
@@ -820,7 +822,8 @@ function SettingsTab() {
       if (error) throw error;
       if(key==='neutrino_bg_url') setNeutrinoBg(url);
       if(key==='allaxe_bg_url') setAllAxeBg(url);
-      toast.success('Background diupdate!');
+      if(key==='og_image_url') setOgBg(url);
+      toast.success('Pengaturan diupdate!');
     } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
     setSaving(null);
   };
@@ -832,7 +835,8 @@ function SettingsTab() {
       await supabase.from('site_settings').upsert({key, value:'', updated_at:new Date().toISOString()});
       if(key==='neutrino_bg_url') setNeutrinoBg('');
       if(key==='allaxe_bg_url') setAllAxeBg('');
-      toast.success('Background direset ke default!');
+      if(key==='og_image_url') setOgBg('');
+      toast.success('Pengaturan direset ke default!');
     } catch (err: any) { toast.error('Gagal reset: ' + (err?.message || '')); }
     setSaving(null);
   };
@@ -899,6 +903,34 @@ function SettingsTab() {
           <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='allaxe_bg_url'?'opacity-50':''}`}>
             {saving==='allaxe_bg_url'?'⏳ Uploading...':'📷 Upload Background All Axe'}
             <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('allaxe_bg_url',e)} disabled={!!saving} />
+          </label>
+        </div>
+
+        {/* OG Image Preview */}
+        <div className="card-dark p-6">
+          <h3 className="text-cream text-sm font-display font-bold mb-1">Foto Preview Web (Open Graph)</h3>
+          <p className="text-cream/40 text-xs mb-4">Foto yang akan muncul saat link web ini dibagikan di WhatsApp, Telegram, atau Medsos lainnya.</p>
+          {ogBg ? (
+            <div className="relative mb-3">
+              <img src={ogBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" />
+              <div className="absolute top-2 right-2">
+                <button
+                  onClick={() => handleResetBg('og_image_url')}
+                  disabled={saving === 'og_image_url_reset'}
+                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
+                >
+                  🗑 Reset
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
+              <span className="text-cream/30 text-xs bg-charcoal-dark/50 px-3 py-1 rounded">Tidak ada foto kustom</span>
+            </div>
+          )}
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='og_image_url'?'opacity-50':''}`}>
+            {saving==='og_image_url'?'⏳ Uploading...':'📷 Upload Foto Preview URL'}
+            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('og_image_url',e)} disabled={!!saving} />
           </label>
         </div>
       </div>

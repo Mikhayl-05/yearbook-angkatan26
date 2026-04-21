@@ -8,11 +8,21 @@ import EasterEgg from '@/components/ui/EasterEgg';
 import { supabase } from '@/lib/supabase';
 import { useInView } from 'react-intersection-observer';
 import { useMusic } from '@/context/MusicContext';
+import Head from 'next/head';
 
 // GRADUATION DATE — 16 Mei 2026
 const GRADUATION_DATE = new Date('2026-05-16T08:00:00');
 
-export default function HomePage() {
+export const getServerSideProps = async () => {
+  let ogImageUrl = null;
+  try {
+    const { data } = await supabase.from('site_settings').select('value').eq('key', 'og_image_url').single();
+    if (data?.value) ogImageUrl = data.value;
+  } catch { /* ignore */ }
+  return { props: { ogImageUrl } };
+};
+
+export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) {
   const [mounted, setMounted] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const [splashOut, setSplashOut] = useState(false);
@@ -20,7 +30,7 @@ export default function HomePage() {
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { play } = useMusic();
+  const { play, isReady } = useMusic();
 
   // Scroll reveal refs
   const { ref: aboutRef, inView: aboutInView } = useInView({ triggerOnce: true, threshold: 0.15 });
@@ -46,13 +56,6 @@ export default function HomePage() {
     }, 700);
   };
 
-  // Auto-dismiss splash after 5s
-  useEffect(() => {
-    if (splashDone) return;
-    const t = setTimeout(() => handleSplashEnter(false), 5000);
-    return () => clearTimeout(t);
-  }, [splashDone]);
-
   // Fetch admin-uploaded background images
   useEffect(() => {
     (async () => {
@@ -70,6 +73,10 @@ export default function HomePage() {
 
   return (
     <>
+      <Head>
+        {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+      </Head>
+
       {/* ── SPLASH SCREEN ──────────────────────────────── */}
       {!splashDone && (
         <div
@@ -132,20 +139,16 @@ export default function HomePage() {
             <p className="text-cream/40 font-body text-xs mb-10">2023 – 2026</p>
 
             <button
-              onClick={() => handleSplashEnter(true)}
-              className="btn-gold text-xs tracking-widest px-8 py-3 animate-pulse hover:animate-none"
+              onClick={() => isReady && handleSplashEnter(true)}
+              disabled={!isReady}
+              className={`text-xs tracking-widest px-8 py-3 transition-colors ${
+                isReady 
+                  ? 'btn-gold animate-pulse hover:animate-none' 
+                  : 'card-dark text-cream/40 cursor-wait border border-gold/20'
+              }`}
             >
-              Masuk →
+              {isReady ? 'Masuk →' : 'Memuat Kenangan...'}
             </button>
-
-            {/* Auto progress bar */}
-            <div className="mt-6 w-48 h-px bg-gold/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gold/40 rounded-full"
-                style={{ animation: 'splashProgress 5s linear forwards' }}
-              />
-            </div>
-            <p className="text-cream/20 text-[10px] font-body mt-2">Masuk otomatis dalam 5 detik…</p>
           </div>
 
           <style>{`
