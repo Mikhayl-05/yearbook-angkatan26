@@ -20,7 +20,7 @@ export default function HomePage() {
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const { play, setIsMinimized } = useMusic();
+  const { play } = useMusic();
 
   // Scroll reveal refs
   const { ref: aboutRef, inView: aboutInView } = useInView({ triggerOnce: true, threshold: 0.15 });
@@ -39,7 +39,6 @@ export default function HomePage() {
     setSplashOut(true);
     if (isUserClick) {
       play(0); // auto-play first track
-      setIsMinimized(false); // Optionally pop open the music player
     }
     setTimeout(() => {
       setSplashDone(true);
