@@ -14,7 +14,7 @@ const GRADUATION_DATE = new Date('2026-05-16T08:00:00');
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
-  const [splashOut, setSplashOut]   = useState(false);
+  const [splashOut, setSplashOut] = useState(false);
   const [hoverSide, setHoverSide] = useState<null | 'left' | 'right'>(null);
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
@@ -68,9 +68,8 @@ export default function HomePage() {
       {/* ── SPLASH SCREEN ──────────────────────────────── */}
       {!splashDone && (
         <div
-          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-all duration-700 ${
-            splashOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
-          }`}
+          className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-all duration-700 ${splashOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
+            }`}
           style={{
             background: 'radial-gradient(ellipse at center, #1c1008 0%, #0c0a09 60%, #050403 100%)',
           }}
@@ -116,7 +115,7 @@ export default function HomePage() {
               className="font-display text-cream font-black mb-6"
               style={{ fontSize: 'clamp(2.2rem, 10vw, 6rem)', lineHeight: 0.9 }}
             >
-              KE-26
+              2026
             </h1>
 
             <div className="flex items-center gap-4 mb-2 text-gold/60">
