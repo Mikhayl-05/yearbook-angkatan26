@@ -592,9 +592,12 @@ function GalleryTab() {
     setUploading(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if(!confirm('Hapus foto ini?')) return;
-    await supabase.from('gallery').delete().eq('id',id); setGallery(g=>g.filter(x=>x.id!==id)); toast.success('Dihapus');
+  const handleDelete = async (id: string, url: string) => {
+    if(!confirm('Hapus foto ini? Foto ini juga akan dihapus dari storage.')) return;
+    await supabase.from('gallery').delete().eq('id',id); 
+    if (url) await deleteFileFromStorage(url);
+    setGallery(g=>g.filter(x=>x.id!==id)); 
+    toast.success('Dihapus');
   };
 
   return (
@@ -628,7 +631,7 @@ function GalleryTab() {
           <div key={g.id} className="relative group rounded-lg overflow-hidden border border-gold/10">
             <img src={g.url} className="w-full h-40 object-cover" />
             <div className="absolute inset-0 bg-charcoal-dark/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button onClick={()=>handleDelete(g.id)} className="admin-btn admin-btn-danger text-xs">🗑 Hapus</button>
+              <button onClick={()=>handleDelete(g.id, g.url)} className="admin-btn admin-btn-danger text-xs">🗑 Hapus</button>
             </div>
             <div className="p-2"><p className="text-cream/70 text-[10px] truncate">{g.caption||'—'}</p></div>
           </div>
@@ -753,9 +756,12 @@ function PlaylistTab() {
     setUploading(false);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, url: string) => {
+    if(!confirm('Hapus lagu ini? File audio juga akan dihapus dari storage.')) return;
     await supabase.from('playlist').delete().eq('id',id);
-    setTracks(t=>t.filter(x=>x.id!==id)); toast.success('Dihapus');
+    if (url) await deleteFileFromStorage(url);
+    setTracks(t=>t.filter(x=>x.id!==id)); 
+    toast.success('Dihapus');
   };
 
   return (
@@ -782,7 +788,7 @@ function PlaylistTab() {
               <div className="text-cream/40 text-[10px]">{t.artist}</div>
             </div>
             {t.url && <audio controls src={t.url} className="h-7 max-w-[120px]" />}
-            <button onClick={()=>handleDelete(t.id)} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">🗑</button>
+            <button onClick={()=>handleDelete(t.id, t.url)} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">🗑</button>
           </div>
         ))}
       </div>
@@ -1119,6 +1125,194 @@ function UsersTab({ session }: { session: any }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TIMELINE TAB ────────────────────────
+function TimelineTab() {
+  const [items, setItems] = useState<TimelineItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editItem, setEditItem] = useState<TimelineItem | null>(null);
+
+  // Form State
+  const [form, setForm] = useState<Omit<TimelineItem, 'id' | 'created_at'>>({
+    date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅'
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { fetchTimeline(); }, []);
+
+  const fetchTimeline = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('timeline').select('*').order('created_at', { ascending: false });
+    if (data) setItems(data as TimelineItem[]);
+    setLoading(false);
+  };
+
+  const handleSave = async () => {
+    if (!form.judul || !form.date || !form.deskripsi) {
+      toast.error('Judul, Tanggal, dan Deskripsi wajib diisi!');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editItem) {
+        const { error } = await supabase.from('timeline').update(form).eq('id', editItem.id);
+        if (error) throw error;
+        toast.success('Timeline diperbarui!');
+      } else {
+        const { error } = await supabase.from('timeline').insert(form);
+        if (error) throw error;
+        toast.success('Timeline ditambahkan!');
+      }
+      fetchTimeline();
+      setShowAdd(false);
+      setEditItem(null);
+      setForm({ date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅' });
+    } catch (err: any) {
+      toast.error('Gagal: ' + (err?.message || 'Terjadi kesalahan'));
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus event timeline ini?')) return;
+    const { error } = await supabase.from('timeline').delete().eq('id', id);
+    if (error) {
+      toast.error('Gagal menghapus');
+    } else {
+      toast.success('Dihapus');
+      setItems(prev => prev.filter(item => item.id !== id));
+    }
+  };
+
+  const openEdit = (item: TimelineItem) => {
+    setForm({
+      date: item.date,
+      judul: item.judul,
+      deskripsi: item.deskripsi,
+      kelas: item.kelas,
+      type: item.type,
+      emoji: item.emoji
+    });
+    setEditItem(item);
+    setShowAdd(true);
+  };
+
+  const typeColors: Record<string, string> = {
+    hafalan: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+    lomba: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+    event: 'text-green-400 bg-green-400/10 border-green-400/20',
+    asrama: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+    wisuda: 'text-gold bg-gold/10 border-gold/20'
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="font-display text-cream text-xl font-bold">Timeline Perjalanan</h2>
+          <p className="text-cream/40 text-xs font-body">{items.length} event terdaftar</p>
+        </div>
+        <button onClick={() => { setEditItem(null); setForm({ date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅' }); setShowAdd(!showAdd); }} className="admin-btn admin-btn-primary text-xs flex-shrink-0">
+          {showAdd ? 'Batal' : '+ Tambah Event'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="card-dark p-6 mb-8 max-w-2xl border-l-2 border-gold">
+          <h3 className="text-cream text-sm font-display font-bold mb-4">{editItem ? 'Edit Event' : 'Tambah Event Baru'}</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="section-label text-[10px] block mb-1">Judul Event</label>
+                <input value={form.judul} onChange={e => setForm(f => ({ ...f, judul: e.target.value }))} className="admin-input" placeholder="Misal: Penerimaan Santri Baru" />
+              </div>
+              <div>
+                <label className="section-label text-[10px] block mb-1">Tanggal / Waktu</label>
+                <input value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="admin-input" placeholder="Misal: Juli 2023" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="section-label text-[10px] block mb-1">Emoji / Ikon</label>
+                <input value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e.target.value }))} className="admin-input text-center text-xl" />
+              </div>
+              <div>
+                <label className="section-label text-[10px] block mb-1">Tipe Event</label>
+                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))} className="admin-select capitalize">
+                  <option value="event">Event Umum</option>
+                  <option value="hafalan">Hafalan Quran</option>
+                  <option value="lomba">Perlombaan</option>
+                  <option value="asrama">Kegiatan Asrama</option>
+                  <option value="wisuda">Wisuda</option>
+                </select>
+              </div>
+              <div>
+                <label className="section-label text-[10px] block mb-1">Target Kelas</label>
+                <select value={form.kelas} onChange={e => setForm(f => ({ ...f, kelas: e.target.value as any }))} className="admin-select">
+                  <option value="both">Semua Kelas</option>
+                  <option value="neutrino">Neutrino Saja</option>
+                  <option value="all-axe">All Axe Saja</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="section-label text-[10px] block mb-1">Deskripsi & Kenangan</label>
+              <textarea value={form.deskripsi} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} rows={4} className="admin-input resize-none" placeholder="Ceritakan detail event ini..." />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSave} disabled={saving} className="admin-btn admin-btn-primary py-2.5 px-6">
+                {saving ? '⏳ Menyimpan...' : '💾 Simpan Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-24 rounded-xl max-w-3xl" />)}
+        </div>
+      ) : (
+        <div className="space-y-3 max-w-4xl">
+          {items.map((item) => (
+            <div key={item.id} className="card-dark p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 group">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-charcoal flex items-center justify-center text-2xl flex-shrink-0 border border-gold/10">
+                  {item.emoji}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-gold font-mono text-xs">{item.date}</span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold tracking-wider uppercase ${typeColors[item.type] || typeColors.event}`}>{item.type}</span>
+                    {item.kelas !== 'both' && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/50 uppercase">{item.kelas}</span>
+                    )}
+                  </div>
+                  <h3 className="font-display text-cream font-bold leading-tight">{item.judul}</h3>
+                  <p className="text-cream/50 text-xs mt-1.5 line-clamp-2 md:line-clamp-none">{item.deskripsi}</p>
+                </div>
+              </div>
+              
+              <div className="flex sm:flex-col gap-2 mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-auto border-t border-gold/10 sm:border-0 pt-3 sm:pt-0 w-full sm:w-auto justify-end">
+                <button onClick={() => openEdit(item)} className="admin-btn admin-btn-ghost text-xs py-1.5 px-3">Edit</button>
+                <button onClick={() => handleDelete(item.id)} className="admin-btn admin-btn-danger text-xs py-1.5 px-3">Hapus</button>
+              </div>
+            </div>
+          ))}
+          {items.length === 0 && (
+            <div className="text-center p-8 border border-dashed border-gold/20 rounded-xl">
+              <p className="text-cream/40 text-sm">Belum ada event timeline.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import CountdownTimer from '@/components/ui/CountdownTimer';
 import EasterEgg from '@/components/ui/EasterEgg';
 import { supabase } from '@/lib/supabase';
 import { useInView } from 'react-intersection-observer';
+import { useMusic } from '@/context/MusicContext';
 
 // GRADUATION DATE — 16 Mei 2026
 const GRADUATION_DATE = new Date('2026-05-16T08:00:00');
@@ -19,6 +20,7 @@ export default function HomePage() {
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const { play, setIsMinimized } = useMusic();
 
   // Scroll reveal refs
   const { ref: aboutRef, inView: aboutInView } = useInView({ triggerOnce: true, threshold: 0.15 });
@@ -33,8 +35,12 @@ export default function HomePage() {
     return () => clearTimeout(t);
   }, []);
 
-  const handleSplashEnter = () => {
+  const handleSplashEnter = (isUserClick = false) => {
     setSplashOut(true);
+    if (isUserClick) {
+      play(0); // auto-play first track
+      setIsMinimized(false); // Optionally pop open the music player
+    }
     setTimeout(() => {
       setSplashDone(true);
       sessionStorage.setItem('splash_seen', '1');
@@ -44,7 +50,7 @@ export default function HomePage() {
   // Auto-dismiss splash after 5s
   useEffect(() => {
     if (splashDone) return;
-    const t = setTimeout(handleSplashEnter, 5000);
+    const t = setTimeout(() => handleSplashEnter(false), 5000);
     return () => clearTimeout(t);
   }, [splashDone]);
 
@@ -127,7 +133,7 @@ export default function HomePage() {
             <p className="text-cream/40 font-body text-xs mb-10">2023 – 2026</p>
 
             <button
-              onClick={handleSplashEnter}
+              onClick={() => handleSplashEnter(true)}
               className="btn-gold text-xs tracking-widest px-8 py-3 animate-pulse hover:animate-none"
             >
               Masuk →
@@ -272,7 +278,7 @@ export default function HomePage() {
           </Link>
 
           {/* CENTER LOGO OVERLAY */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none hidden sm:block">
             <div className="w-16 h-16 rounded-full border-2 border-gold bg-charcoal-dark/90 backdrop-blur-sm flex flex-col items-center justify-center shadow-gold animate-pulse-gold">
               <div className="text-gold font-heading font-bold text-base leading-none">26</div>
               <div className="text-gold/60 font-heading text-[8px] tracking-widest">XVI</div>

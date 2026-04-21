@@ -44,7 +44,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      <nav className={`fixed top-0 left-0 right-0 z-[999] transition-all duration-500 ${
         scrolled
           ? 'bg-charcoal-900/95 backdrop-blur-md border-b border-gold/20 shadow-lg'
           : 'bg-transparent'
@@ -125,25 +125,27 @@ export default function Navbar() {
               </button>
 
               {/* AUTH */}
-              {user ? (
-                <div className="flex items-center gap-2">
-                  {isAdmin && (
-                    <Link href="/admin" className="text-gold/70 hover:text-gold text-xs font-heading tracking-wider transition-colors flex items-center h-8">
-                      Admin
-                    </Link>
-                  )}
-                  <button
-                    onClick={signOut}
-                    className="text-cream/50 hover:text-red-400 text-xs transition-colors"
-                  >
-                    Keluar
-                  </button>
-                </div>
-              ) : (
-                <Link href="/login" className="btn-outline-gold text-xs py-1.5 px-4">
-                  Login
-                </Link>
-              )}
+              <div className="hidden sm:flex items-center gap-2">
+                {user ? (
+                  <>
+                    {isAdmin && (
+                      <Link href="/admin" className="text-gold/70 hover:text-gold text-xs font-heading tracking-wider transition-colors flex items-center h-8">
+                        Admin
+                      </Link>
+                    )}
+                    <button
+                      onClick={signOut}
+                      className="text-cream/50 hover:text-red-400 text-xs transition-colors"
+                    >
+                      Keluar
+                    </button>
+                  </>
+                ) : (
+                  <Link href="/login" className="btn-outline-gold text-xs py-1.5 px-4">
+                    Login
+                  </Link>
+                )}
+              </div>
 
               {/* HAMBURGER */}
               <button

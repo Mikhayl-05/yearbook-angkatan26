@@ -286,3 +286,47 @@ export const addTrack = async (track: Omit<Track, 'id'>) => {
 export const deleteTrack = async (id: string) => {
   return supabase.from('playlist').delete().eq('id', id);
 };
+
+// ─── TIMELINE ────────────────────────────────────────────────
+export type TimelineItem = {
+  id: string;
+  date: string;
+  judul: string;
+  deskripsi: string;
+  kelas: 'neutrino' | 'all-axe' | 'both';
+  type: 'hafalan' | 'lomba' | 'event' | 'asrama' | 'wisuda';
+  emoji: string;
+  created_at: string;
+};
+
+export const getTimelineItems = async () => {
+  return supabase.from('timeline').select('*').order('created_at');
+};
+
+export const addTimelineItem = async (item: Omit<TimelineItem, 'id' | 'created_at'>) => {
+  return supabase.from('timeline').insert(item).select().single();
+};
+
+export const updateTimelineItem = async (id: string, updates: Record<string, unknown>) => {
+  return supabase.from('timeline').update(updates).eq('id', id);
+};
+
+export const deleteTimelineItem = async (id: string) => {
+  return supabase.from('timeline').delete().eq('id', id);
+};
+
+// ─── STORAGE DELETE HELPER ───────────────────────────────────
+export const deleteFileFromStorage = async (url: string) => {
+  try {
+    // Extract the file path from the public URL
+    // Public URL format: https://[project-id].supabase.co/storage/v1/object/public/[bucket]/[path]
+    const urlParts = url.split('/yearbook/');
+    if (urlParts.length !== 2) return;
+    
+    const filePath = urlParts[1];
+    const { error } = await supabase.storage.from('yearbook').remove([filePath]);
+    if (error) console.error('Error deleting file from storage:', error);
+  } catch (err) {
+    console.error('Failed to parse URL for deletion:', err);
+  }
+};
