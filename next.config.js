@@ -19,7 +19,9 @@ const withPWA = require('next-pwa')({
 });
 
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-const formattedBasePath = basePath && !basePath.startsWith('/') ? `/${basePath}` : basePath;
+// Gunakan basePath hanya jika diawali dengan / (format benar). 
+// Jika tidak (seperti 'yearbook-26'), kita kosongkan agar tidak terjadi error 404 di root Vercel.
+const formattedBasePath = (basePath && basePath.startsWith('/')) ? basePath : '';
 
 const nextConfig = {
   trailingSlash: true,
