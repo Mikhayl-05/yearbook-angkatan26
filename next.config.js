@@ -18,11 +18,14 @@ const withPWA = require('next-pwa')({
   ]
 });
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+const formattedBasePath = basePath && !basePath.startsWith('/') ? `/${basePath}` : basePath;
+
 const nextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
-  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  basePath: formattedBasePath,
+  assetPrefix: formattedBasePath,
 };
 
 module.exports = withPWA(nextConfig);
