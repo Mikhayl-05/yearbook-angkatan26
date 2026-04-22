@@ -229,10 +229,6 @@ export default function SantriDetailPage() {
                   <div className="text-cream/30 text-[10px] font-heading tracking-wider uppercase mb-1">Kelas</div>
                   <div className="text-cream text-sm font-display font-bold">🏫 {santri.kelas === 'neutrino' ? 'Neutrino 9A' : 'All Axe 9B'}</div>
                 </div>
-                <div className="card-dark p-4">
-                  <div className="text-cream/30 text-[10px] font-heading tracking-wider uppercase mb-1">No Absen</div>
-                  <div className="text-cream text-sm font-display font-bold">📋 {santri.no}</div>
-                </div>
               </div>
 
               {/* DESKRIPSI */}

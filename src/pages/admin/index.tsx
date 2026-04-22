@@ -94,7 +94,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 lg:ml-64 px-3 sm:px-4 md:px-8 py-6 sm:py-8 pb-28 lg:pb-8">
+        <main className="flex-1 min-w-0 overflow-x-visible lg:ml-64 px-3 sm:px-4 md:px-8 py-6 sm:py-8 pb-28 lg:pb-8">
           {tab === 'dashboard'   && <DashboardTab stats={stats} setTab={setTab} />}
           {tab === 'santri'      && <SantriTab />}
           {tab === 'guru'        && <GuruTab />}
@@ -187,11 +187,16 @@ function SantriTab() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gold/15">
-        <table className="admin-table">
+      <div className="overflow-x-auto block w-full min-w-0 rounded-xl border border-gold/15" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="admin-table min-w-[800px] w-full">
           <thead>
             <tr>
-              <th>#</th><th>Nama</th><th>Kelas</th><th>Jabatan</th><th>Foto</th><th>Aksi</th>
+              <th className="w-12">#</th>
+              <th>Nama</th>
+              <th>Kelas</th>
+              <th>Jabatan</th>
+              <th>Foto</th>
+              <th>Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -202,11 +207,11 @@ function SantriTab() {
             ) : filtered.map((s, idx) => (
               <tr key={s.id}>
                 <td className="font-mono text-gold/50 text-xs">{idx + 1}</td>
-                <td className="font-display font-bold text-sm">{s.nama}</td>
+                <td className="font-display font-bold text-sm whitespace-nowrap">{s.nama}</td>
                 <td><span className={`admin-badge ${s.kelas === 'neutrino' ? 'admin-badge-approved' : 'admin-badge-pending'}`}>{s.kelas}</span></td>
-                <td className="text-cream/50 text-xs capitalize">{s.jabatan || 'anggota'}</td>
+                <td className="text-cream/50 text-xs capitalize whitespace-nowrap">{s.jabatan || 'anggota'}</td>
                 <td>{s.foto ? <div className="w-8 h-8 rounded-md overflow-hidden border border-gold/20"><img src={s.foto} className="w-full h-full object-cover" /></div> : <span className="text-cream/20 text-xs">—</span>}</td>
-                <td>
+                <td className="whitespace-nowrap">
                   <div className="flex gap-2">
                     <button onClick={() => setEditModal(s)} className="admin-btn admin-btn-ghost text-[10px] py-1 px-2">Edit</button>
                     <button onClick={async () => { if(!confirm(`Hapus ${s.nama}?`)) return; await supabase.from('santri').delete().eq('id',s.id); fetchSantri(); toast.success('Dihapus'); }} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Hapus</button>
@@ -458,7 +463,6 @@ function AddSantriModal({ onClose, onSave }: { onClose: () => void; onSave: () =
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="section-label text-[10px] block mb-2">No Absen (opsional)</label><input type="number" value={form.no||''} onChange={e => setForm(f=>({...f,no:Number(e.target.value)}))} className="admin-input" /></div>
             <div><label className="section-label text-[10px] block mb-2">Kelas</label><select value={form.kelas} onChange={e => setForm(f=>({...f,kelas:e.target.value as any}))} className="admin-select"><option value="neutrino">Neutrino</option><option value="all-axe">All Axe</option></select></div>
           </div>
           <div><label className="section-label text-[10px] block mb-2">Nama Lengkap</label><input value={form.nama} onChange={e => setForm(f=>({...f,nama:e.target.value}))} className="admin-input" /></div>
@@ -818,7 +822,7 @@ function SettingsTab() {
     setSaving(key);
     try {
       const url = await uploadPhoto(file, `settings/${key}_${Date.now()}.${file.name.split('.').pop()}`);
-      const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()});
+      const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()}, { onConflict: 'key' });
       if (error) throw error;
       if(key==='neutrino_bg_url') setNeutrinoBg(url);
       if(key==='allaxe_bg_url') setAllAxeBg(url);
@@ -828,11 +832,13 @@ function SettingsTab() {
     setSaving(null);
   };
 
-  const handleResetBg = async (key: string) => {
+  const handleResetBg = async (key: string, oldUrl: string) => {
     if (!confirm('Reset background ke default? Foto yang diupload akan dihapus dari pengaturan.')) return;
     setSaving(key + '_reset');
     try {
-      await supabase.from('site_settings').upsert({key, value:'', updated_at:new Date().toISOString()});
+      const { error } = await supabase.from('site_settings').upsert({key, value:'', updated_at:new Date().toISOString()}, { onConflict: 'key' });
+      if (error) throw error;
+      if (oldUrl) await deleteFileFromStorage(oldUrl);
       if(key==='neutrino_bg_url') setNeutrinoBg('');
       if(key==='allaxe_bg_url') setAllAxeBg('');
       if(key==='og_image_url') setOgBg('');
@@ -856,7 +862,7 @@ function SettingsTab() {
               <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={() => handleResetBg('neutrino_bg_url')}
+                  onClick={() => handleResetBg('neutrino_bg_url', neutrinoBg)}
                   disabled={saving === 'neutrino_bg_url_reset'}
                   className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
                 >
@@ -886,7 +892,7 @@ function SettingsTab() {
               <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={() => handleResetBg('allaxe_bg_url')}
+                  onClick={() => handleResetBg('allaxe_bg_url', allAxeBg)}
                   disabled={saving === 'allaxe_bg_url_reset'}
                   className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
                 >
@@ -915,7 +921,7 @@ function SettingsTab() {
               <img src={ogBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" />
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={() => handleResetBg('og_image_url')}
+                  onClick={() => handleResetBg('og_image_url', ogBg)}
                   disabled={saving === 'og_image_url_reset'}
                   className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
                 >
@@ -1117,7 +1123,7 @@ function UsersTab({ session }: { session: any }) {
           {Array.from({length:5}).map((_,i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gold/15 w-full">
+        <div className="overflow-x-auto block w-full min-w-0 rounded-xl border border-gold/15" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="admin-table w-full min-w-[700px]">
             <thead>
               <tr>
@@ -1169,6 +1175,7 @@ function TimelineTab() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editItem, setEditItem] = useState<TimelineItem | null>(null);
+  const { session } = useAuth();
 
   // Form State
   const [form, setForm] = useState<Omit<TimelineItem, 'id' | 'created_at'>>({
@@ -1192,13 +1199,23 @@ function TimelineTab() {
     }
     setSaving(true);
     try {
+      const token = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
+      
       if (editItem) {
-        const { error } = await supabase.from('timeline').update(form).eq('id', editItem.id);
-        if (error) throw error;
+        const res = await fetch('/api/admin/timeline', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: editItem.id, ...form }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
         toast.success('Timeline diperbarui!');
       } else {
-        const { error } = await supabase.from('timeline').insert(form);
-        if (error) throw error;
+        const res = await fetch('/api/admin/timeline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(form),
+        });
+        if (!res.ok) throw new Error((await res.json()).error);
         toast.success('Timeline ditambahkan!');
       }
       fetchTimeline();
@@ -1213,12 +1230,18 @@ function TimelineTab() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus event timeline ini?')) return;
-    const { error } = await supabase.from('timeline').delete().eq('id', id);
-    if (error) {
-      toast.error('Gagal menghapus');
-    } else {
+    try {
+      const token = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
+      const res = await fetch('/api/admin/timeline', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
       toast.success('Dihapus');
       setItems(prev => prev.filter(item => item.id !== id));
+    } catch (err: any) {
+      toast.error('Gagal menghapus: ' + (err?.message || ''));
     }
   };
 

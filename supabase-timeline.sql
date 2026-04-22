@@ -1,5 +1,6 @@
 -- ── TIMELINE TABLE ───────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS timeline (
+DROP TABLE IF EXISTS timeline;
+CREATE TABLE timeline (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   date        TEXT NOT NULL,            -- e.g. 'Juli 2023'
   judul       TEXT NOT NULL,

@@ -93,7 +93,7 @@ export default function KelasPage() {
           <div className="divider-ornament justify-center mb-6">
             <span className="section-label text-[10px]">🎓 Wali Kelas</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 mb-4">
             {guruList.map((guru, i) => (
               <StudentCard
                 key={guru.id}
@@ -127,7 +127,7 @@ export default function KelasPage() {
 
         {loading ? (
           // Skeleton loading
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="skeleton-card">
                 <div className="skeleton-img" />
@@ -137,7 +137,7 @@ export default function KelasPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
             {filtered.map((santri, i) => (
               <StudentCard
                 key={santri.id}

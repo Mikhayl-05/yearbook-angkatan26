@@ -48,6 +48,7 @@ const pageTransition = {
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const isAdmin = router.pathname.startsWith('/admin');
 
   return (
     <>
@@ -85,7 +86,7 @@ export default function App({ Component, pageProps }: AppProps) {
               <Component {...pageProps} />
             </motion.div>
           </AnimatePresence>
-          <MusicPlayer />
+          {!isAdmin && <MusicPlayer />}
           <Toaster
             position="bottom-right"
             toastOptions={{

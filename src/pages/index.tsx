@@ -29,6 +29,8 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
   const [hoverSide, setHoverSide] = useState<null | 'left' | 'right'>(null);
   const [neutrinoBg, setNeutrinoBg] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
+  const [neutrinoCount, setNeutrinoCount] = useState(29);
+  const [allAxeCount, setAllAxeCount] = useState(10);
   const containerRef = useRef<HTMLDivElement>(null);
   const { play, isReady } = useMusic();
 
@@ -56,7 +58,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
     }, 700);
   };
 
-  // Fetch admin-uploaded background images
+  // Fetch admin-uploaded background images and student counts
   useEffect(() => {
     (async () => {
       try {
@@ -67,6 +69,12 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
             if (s.key === 'allaxe_bg_url' && s.value) setAllAxeBg(s.value);
           });
         }
+        
+        const { count: c1 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'neutrino');
+        if (c1 !== null) setNeutrinoCount(c1);
+        
+        const { count: c2 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'all-axe');
+        if (c2 !== null) setAllAxeCount(c2);
       } catch { /* */ }
     })();
   }, []);
@@ -208,7 +216,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
               <div className="section-label text-cream/50 text-[10px] mb-6">Angkatan XVI · 2023–2026</div>
               <div className="flex justify-center gap-8 mb-8">
                 <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">29</div>
+                  <div className="text-2xl font-display font-bold text-gold">{neutrinoCount}</div>
                   <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Santri</div>
                 </div>
                 <div className="w-px bg-gold/20" />
@@ -259,7 +267,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
               <div className="section-label text-cream/50 text-[10px] mb-6">Angkatan XVI · 2023–2026</div>
               <div className="flex justify-center gap-8 mb-8">
                 <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">10</div>
+                  <div className="text-2xl font-display font-bold text-gold">{allAxeCount}</div>
                   <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Santri</div>
                 </div>
                 <div className="w-px bg-gold/20" />
@@ -335,7 +343,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
 
               <div className="col-span-12 md:col-span-7 grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Total Santri', value: '39', sub: 'Ikhwa & Akhwat' },
+                  { label: 'Total Santri', value: String(neutrinoCount + allAxeCount), sub: 'Ikhwa & Akhwat' },
                   { label: 'Angkatan Ke', value: 'XVI', sub: 'Sejak Berdiri' },
                   { label: 'Tahun Bersama', value: '3', sub: '2023–2026' },
                   { label: 'Hafalan', value: '∞', sub: 'Juz Al-Quran' },
