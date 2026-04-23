@@ -6,6 +6,9 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// ─── ROLE TYPES ───────────────────────────────────────────────
+export type UserRole = 'root' | 'manager_ikhwa' | 'manager_akhwat';
+
 // ─── AUTH HELPERS ─────────────────────────────────────────────
 export const signIn = async (email: string, password: string) => {
   return supabase.auth.signInWithPassword({ email, password });

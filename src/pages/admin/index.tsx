@@ -10,11 +10,31 @@ import { LINK_GRADIENT_PRESETS } from '@/components/sections/StudentCard';
 
 type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users';
 
+const getAccessToken = async (): Promise<string> => {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
+};
+
+const callAdminContent = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body: Record<string, any>) => {
+  const token = await getAccessToken();
+  const res = await fetch('/api/admin/content', {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: method === 'GET' ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Akses ditolak');
+  return data;
+};
+
 export default function AdminDashboard() {
-  const { user, isAdmin, loading, session } = useAuth();
+  const { user, isAdmin, loading, session, userRole } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const [stats, setStats] = useState({ santri: 0, photos: 0, notes: 0, tracks: 0, pending: 0 });
+
+  const scopeKelas = userRole === 'manager_ikhwa' ? 'neutrino' : userRole === 'manager_akhwat' ? 'all-axe' : null;
+  const isRoot = userRole === 'root';
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -23,16 +43,33 @@ export default function AdminDashboard() {
     }
   }, [user, isAdmin, loading]);
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => { fetchStats(); }, [scopeKelas]);
 
   const fetchStats = async () => {
     try {
+      const pendingQuery = supabase
+        .from('gallery_submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      const scopedPendingQuery = scopeKelas ? pendingQuery.or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`) : pendingQuery;
+
+      const santriQuery = scopeKelas
+        ? supabase.from('santri').select('id', { count: 'exact', head: true }).or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`)
+        : supabase.from('santri').select('id', { count: 'exact', head: true });
+      const galleryQuery = scopeKelas
+        ? supabase.from('gallery').select('id', { count: 'exact', head: true }).or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`)
+        : supabase.from('gallery').select('id', { count: 'exact', head: true });
+      const notesQuery = scopeKelas
+        ? supabase.from('sticky_notes').select('id', { count: 'exact', head: true }).or(`kelas.eq.${scopeKelas},kelas.eq.general,kelas.eq.both`)
+        : supabase.from('sticky_notes').select('id', { count: 'exact', head: true });
+      const playlistQuery = supabase.from('playlist').select('id', { count: 'exact', head: true });
+
       const [s1, s2, s3, s4, s5] = await Promise.all([
-        supabase.from('santri').select('id', { count: 'exact', head: true }),
-        supabase.from('gallery').select('id', { count: 'exact', head: true }),
-        supabase.from('sticky_notes').select('id', { count: 'exact', head: true }),
-        supabase.from('playlist').select('id', { count: 'exact', head: true }),
-        supabase.from('gallery_submissions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        santriQuery,
+        galleryQuery,
+        notesQuery,
+        playlistQuery,
+        scopedPendingQuery,
       ]);
       setStats({ santri: s1.count||0, photos: s2.count||0, notes: s3.count||0, tracks: s4.count||0, pending: s5.count||0 });
     } catch { /* */ }
@@ -53,9 +90,9 @@ export default function AdminDashboard() {
     { id: 'submissions', label: 'Pending',      icon: '📤', badge: stats.pending },
     { id: 'notes',       label: 'Quote Wall',   icon: '📌' },
     { id: 'playlist',    label: 'Playlist',     icon: '🎵' },
-    { id: 'timeline',    label: 'Timeline',     icon: '📅' },
-    { id: 'settings',    label: 'Pengaturan',   icon: '⚙️' },
-    { id: 'users',       label: 'Akun',         icon: '🔐' },
+    ...(isRoot ? [{ id: 'timeline' as const, label: 'Timeline', icon: '📅' }] : []),
+    ...(isRoot ? [{ id: 'settings' as const, label: 'Pengaturan', icon: '⚙️' }] : []),
+    ...(isRoot ? [{ id: 'users' as const, label: 'Akun', icon: '🔐' }] : []),
   ];
 
   return (
@@ -96,15 +133,15 @@ export default function AdminDashboard() {
         {/* MAIN CONTENT */}
         <main className="flex-1 min-w-0 overflow-x-visible lg:ml-64 px-3 sm:px-4 md:px-8 py-6 sm:py-8 pb-28 lg:pb-8">
           {tab === 'dashboard'   && <DashboardTab stats={stats} setTab={setTab} />}
-          {tab === 'santri'      && <SantriTab />}
-          {tab === 'guru'        && <GuruTab />}
-          {tab === 'gallery'     && <GalleryTab />}
-          {tab === 'submissions' && <SubmissionsTab onUpdate={fetchStats} />}
-          {tab === 'notes'       && <NotesTab />}
-          {tab === 'playlist'    && <PlaylistTab />}
-          {tab === 'timeline'    && <TimelineTab />}
-          {tab === 'settings'    && <SettingsTab />}
-          {tab === 'users'       && <UsersTab session={session} />}
+          {tab === 'santri'      && <SantriTab scopeKelas={scopeKelas} />}
+          {tab === 'guru'        && <GuruTab scopeKelas={scopeKelas} />}
+          {tab === 'gallery'     && <GalleryTab scopeKelas={scopeKelas} />}
+          {tab === 'submissions' && <SubmissionsTab onUpdate={fetchStats} scopeKelas={scopeKelas} />}
+          {tab === 'notes'       && <NotesTab scopeKelas={scopeKelas} />}
+          {tab === 'playlist'    && <PlaylistTab scopeKelas={scopeKelas} />}
+          {tab === 'timeline'    && isRoot && <TimelineTab />}
+          {tab === 'settings'    && isRoot && <SettingsTab />}
+          {tab === 'users'       && isRoot && <UsersTab session={session} />}
         </main>
       </div>
     </div>
@@ -146,25 +183,35 @@ function DashboardTab({ stats, setTab }: { stats: any; setTab: (t: AdminTab) => 
 }
 
 // ── SANTRI TAB ────────────────────────
-function SantriTab() {
+function SantriTab({ scopeKelas }: { scopeKelas: string | null }) {
   const [santri, setSantri] = useState<SantriDB[]>([]);
   const [search, setSearch] = useState('');
-  const [kelasFilter, setKelasFilter] = useState('all');
+  const [kelasFilter, setKelasFilter] = useState(scopeKelas ?? 'all');
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState<SantriDB | null>(null);
   const [addModal, setAddModal] = useState(false);
 
   useEffect(() => { fetchSantri(); }, []);
 
-  const fetchSantri = async () => {
-    setLoading(true);
+  const fetchSantri = async (background = false) => {
+    if (!background) setLoading(true);
     const { data } = await supabase.from('santri').select('*').order('nama', { ascending: true });
     if (data) setSantri(data as SantriDB[]);
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (editModal || addModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [editModal, addModal]);
+
+  const effectiveKelasFilter = scopeKelas ?? kelasFilter;
   const filtered = santri.filter(s =>
-    (kelasFilter === 'all' || s.kelas === kelasFilter) &&
+    (effectiveKelasFilter === 'all' || s.kelas === effectiveKelasFilter || s.kelas as any === 'both' || s.kelas as any === 'all') &&
     (s.nama.toLowerCase().includes(search.toLowerCase()) || s.tempat_lahir.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -180,11 +227,15 @@ function SantriTab() {
 
       <div className="flex flex-wrap gap-3 mb-6">
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari nama..." className="admin-input max-w-xs" />
-        <select value={kelasFilter} onChange={e => setKelasFilter(e.target.value)} className="admin-select max-w-[160px]">
-          <option value="all">Semua Kelas</option>
-          <option value="neutrino">Neutrino</option>
-          <option value="all-axe">All Axe</option>
-        </select>
+        {!scopeKelas ? (
+          <select value={kelasFilter} onChange={e => setKelasFilter(e.target.value)} className="admin-select max-w-[160px]">
+            <option value="all">Semua Kelas</option>
+            <option value="neutrino">Neutrino</option>
+            <option value="all-axe">All Axe</option>
+          </select>
+        ) : (
+          <div className="admin-badge admin-badge-approved text-xs px-3 py-2">{scopeKelas}</div>
+        )}
       </div>
 
       <div className="overflow-x-auto block w-full min-w-0 rounded-xl border border-gold/15" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -214,7 +265,16 @@ function SantriTab() {
                 <td className="whitespace-nowrap">
                   <div className="flex gap-2">
                     <button onClick={() => setEditModal(s)} className="admin-btn admin-btn-ghost text-[10px] py-1 px-2">Edit</button>
-                    <button onClick={async () => { if(!confirm(`Hapus ${s.nama}?`)) return; await supabase.from('santri').delete().eq('id',s.id); fetchSantri(); toast.success('Dihapus'); }} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Hapus</button>
+                    <button onClick={async () => {
+                      if(!confirm(`Hapus ${s.nama}?`)) return;
+                      try {
+                        await callAdminContent('DELETE', { resource: 'santri', id: s.id });
+                        fetchSantri();
+                        toast.success('Dihapus');
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Gagal menghapus');
+                      }
+                    }} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Hapus</button>
                   </div>
                 </td>
               </tr>
@@ -223,8 +283,8 @@ function SantriTab() {
         </table>
       </div>
 
-      {editModal && <EditSantriModal santri={editModal} onClose={() => setEditModal(null)} onSave={() => { setEditModal(null); fetchSantri(); }} />}
-      {addModal && <AddSantriModal onClose={() => setAddModal(false)} onSave={() => { setAddModal(false); fetchSantri(); }} />}
+      {editModal && <EditSantriModal scopeKelas={scopeKelas} santri={editModal} onClose={() => setEditModal(null)} onSave={() => { setEditModal(null); fetchSantri(true); }} />}
+      {addModal && <AddSantriModal scopeKelas={scopeKelas} onClose={() => setAddModal(false)} onSave={() => { setAddModal(false); fetchSantri(true); }} />}
     </div>
   );
 }
@@ -297,7 +357,7 @@ function CustomLinksEditor({ links, onChange }: { links: CustomLink[]; onChange:
 }
 
 // ── EDIT SANTRI MODAL ─────────────────
-function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClose: () => void; onSave: () => void }) {
+function EditSantriModal({ scopeKelas, santri, onClose, onSave }: { scopeKelas: string | null; santri: SantriDB; onClose: () => void; onSave: () => void }) {
   const [form, setForm] = useState({ ...santri });
   const [customLinks, setCustomLinks] = useState<CustomLink[]>(() => {
     try {
@@ -308,16 +368,28 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
 
   const handleSave = async () => {
     setSaving(true);
     const { id, created_at, updated_at, ...updates } = form;
     (updates as any).custom_links = customLinks;
-    const { error } = await supabase.from('santri').update(updates).eq('id', santri.id);
-    if (error) { toast.error('Gagal menyimpan: ' + error.message); setSaving(false); return; }
-    toast.success('Data diperbarui!');
+    try {
+      await callAdminContent('PATCH', { resource: 'santri', id: santri.id, updates });
+      toast.success('Data diperbarui!');
+      handleClose(true);
+    } catch (err: any) {
+      toast.error('Gagal menyimpan: ' + (err?.message || ''));
+    }
     setSaving(false);
-    onSave();
   };
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,100 +410,167 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
   };
 
   return (
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div className="admin-modal max-w-lg w-full" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h3 className="font-display text-cream text-base sm:text-lg font-bold truncate pr-4">Edit: {santri.nama}</h3>
-          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl flex-shrink-0">×</button>
-        </div>
-        <div className="space-y-3 sm:space-y-4 max-h-[70vh] overflow-y-auto pr-1 sm:pr-2">
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} 
+        onClick={() => handleClose()}
+      />
+      
+      {/* Modal Card */}
+      <div className={`relative w-full max-w-lg bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        {/* Decorative elements */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        
+        {/* Header - Compact */}
+        <div className="relative flex items-center justify-between px-5 py-4 border-b border-white/5 opacity-0 animate-fade-in-fast animate-stagger-1">
           <div>
-            <label className="section-label text-[10px] block mb-2">Foto Utama</label>
-            <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-              {form.foto
-                ? <img src={form.foto} className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-cover border border-gold/20 flex-shrink-0" />
-                : <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg skeleton flex-shrink-0 flex items-center justify-center text-cream/20 text-xs">No foto</div>
-              }
-              <div className="flex flex-col gap-2">
-                <label className={`admin-btn admin-btn-ghost text-xs cursor-pointer ${uploading ? 'opacity-50' : ''}`}>
-                  {uploading ? '⏳ Uploading...' : '📷 Ganti Foto'}
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} />
-                </label>
-                {form.foto && (
-                  <button
-                    type="button"
-                    onClick={handleDeletePhoto}
-                    className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
-                  >
-                    🗑 Hapus Foto
-                  </button>
-                )}
+            <h3 className="font-display text-cream text-base font-bold leading-tight truncate max-w-[200px]">Edit: {santri.nama}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="w-5 h-[1px] bg-gold/30" />
+              <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading">Manajemen Profil</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => handleClose()} 
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white hover:bg-red-500/20 transition-all duration-300"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body - Scrollable */}
+        <div className="relative flex-1 overflow-y-auto p-5 pt-4 custom-scrollbar">
+          <div className="space-y-6">
+            {/* Photo Section */}
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-2">
+              <label className="section-label text-[8px] block mb-2 uppercase tracking-[0.2em] font-bold">Foto Profil</label>
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  {form.foto ? (
+                    <img src={form.foto} className="w-16 h-16 rounded-xl object-cover border border-gold/30 shadow-lg shadow-gold/5" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-cream/20">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={`admin-btn bg-white/5 border border-white/10 hover:border-gold/30 text-[9px] py-1.5 px-3 cursor-pointer transition-all ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {uploading ? 'UPLOADING...' : 'GANTI FOTO'}
+                    <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} />
+                  </label>
+                  {form.foto && (
+                    <button onClick={handleDeletePhoto} className="text-red-400/50 hover:text-red-400 text-[8px] font-bold uppercase tracking-widest pl-1 transition-colors">
+                      Hapus Foto
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Basic Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 opacity-0 animate-fade-in-fast animate-stagger-3">
+              <div className="sm:col-span-2">
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Nama Lengkap</label>
+                <input value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} className="admin-input text-xs py-2" />
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Tempat Lahir</label>
+                <input value={form.tempat_lahir} onChange={e => setForm(f => ({ ...f, tempat_lahir: e.target.value }))} className="admin-input text-xs py-2" />
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Tanggal Lahir</label>
+                <input type="date" value={form.tanggal_lahir} onChange={e => setForm(f => ({ ...f, tanggal_lahir: e.target.value }))} className="admin-input text-xs py-2" />
+              </div>
+            </div>
+
+            {/* Role & Class */}
+            <div className="grid grid-cols-2 gap-4 opacity-0 animate-fade-in-fast animate-stagger-4">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Jabatan</label>
+                <select value={form.jabatan || 'anggota'} onChange={e => setForm(f => ({ ...f, jabatan: e.target.value }))} className="admin-select text-xs py-2">
+                  <option value="anggota">Anggota</option>
+                  <option value="ketua">Ketua</option>
+                  <option value="sekretaris">Sekretaris</option>
+                  <option value="bendahara">Bendahara</option>
+                </select>
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Kelas</label>
+                <select
+                  value={scopeKelas ?? form.kelas}
+                  onChange={e => setForm(f => ({ ...f, kelas: e.target.value as any }))}
+                  className="admin-select text-xs py-2"
+                  disabled={!!scopeKelas}
+                >
+                  <option value="neutrino">Neutrino</option>
+                  <option value="all-axe">All Axe</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Social Links */}
+            <div className="grid grid-cols-2 gap-4 opacity-0 animate-fade-in-fast animate-stagger-5">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Instagram</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/20 text-[10px]">@</span>
+                  <input value={form.instagram || ''} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="username" className="admin-input pl-7 text-xs py-2" />
+                </div>
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">WhatsApp</label>
+                <input value={form.wa || ''} onChange={e => setForm(f => ({ ...f, wa: e.target.value }))} placeholder="08xxx" className="admin-input text-xs py-2" />
+              </div>
+            </div>
+
+            {/* Custom Links */}
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-5">
+              <CustomLinksEditor links={customLinks} onChange={setCustomLinks} />
+            </div>
+
+            {/* Quotes & Bio */}
+            <div className="space-y-4 opacity-0 animate-fade-in-fast animate-stagger-5 pb-2">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Quote Utama</label>
+                <textarea value={form.quote || ''} onChange={e => setForm(f => ({ ...f, quote: e.target.value }))} rows={2} className="admin-input resize-none text-xs py-2" placeholder="Kata mutiara..." />
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Deskripsi / Bio</label>
+                <textarea value={(form as any).deskripsi || ''} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value } as any))} rows={3} className="admin-input resize-none text-xs py-2" placeholder="Tentang santri ini..." />
               </div>
             </div>
           </div>
-          <div>
-            <label className="section-label text-[10px] block mb-2">Nama</label>
-            <input value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} className="admin-input" />
-          </div>
-
-          {/* Tempat & Tanggal Lahir */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">Tempat Lahir</label>
-              <input value={form.tempat_lahir} onChange={e => setForm(f => ({ ...f, tempat_lahir: e.target.value }))} className="admin-input" />
-            </div>
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">Tanggal Lahir</label>
-              <input type="date" value={form.tanggal_lahir} onChange={e => setForm(f => ({ ...f, tanggal_lahir: e.target.value }))} className="admin-input" />
-            </div>
-          </div>
-
-          {/* Jabatan & Kelas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">Jabatan</label>
-              <select value={form.jabatan || 'anggota'} onChange={e => setForm(f => ({ ...f, jabatan: e.target.value }))} className="admin-select">
-                <option value="anggota">Anggota</option>
-                <option value="ketua">Ketua</option>
-                <option value="sekretaris">Sekretaris</option>
-                <option value="bendahara">Bendahara</option>
-              </select>
-            </div>
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">Kelas</label>
-              <select value={form.kelas} onChange={e => setForm(f => ({ ...f, kelas: e.target.value as any }))} className="admin-select">
-                <option value="neutrino">Neutrino</option>
-                <option value="all-axe">All Axe</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Instagram & WA */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">Instagram (tanpa @)</label>
-              <input value={form.instagram || ''} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} placeholder="username" className="admin-input" />
-            </div>
-            <div>
-              <label className="section-label text-[10px] block mb-1.5">WhatsApp</label>
-              <input value={form.wa || ''} onChange={e => setForm(f => ({ ...f, wa: e.target.value }))} placeholder="08xxx atau +62xxx" className="admin-input" />
-            </div>
-          </div>
-
-          {/* Custom Links */}
-          <CustomLinksEditor links={customLinks} onChange={setCustomLinks} />
-          <div>
-            <label className="section-label text-[10px] block mb-2">Quote</label>
-            <textarea value={form.quote || ''} onChange={e => setForm(f => ({ ...f, quote: e.target.value }))} rows={2} className="admin-input resize-none" placeholder="Quote santri..." />
-          </div>
-          <div>
-            <label className="section-label text-[10px] block mb-2">Deskripsi</label>
-            <textarea value={(form as any).deskripsi || ''} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value } as any))} rows={3} className="admin-input resize-none" placeholder="Deskripsi tentang santri..." />
-          </div>
         </div>
-        <div className="flex gap-3 mt-4 sm:mt-6">
-          <button onClick={onClose} className="admin-btn admin-btn-ghost flex-1 py-2.5 justify-center">Batal</button>
-          <button onClick={handleSave} disabled={saving} className="admin-btn admin-btn-primary flex-1 py-2.5 justify-center">{saving ? 'Menyimpan...' : '💾 Simpan'}</button>
+
+        {/* Footer - Compact */}
+        <div className="relative p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md opacity-0 animate-fade-in-fast animate-stagger-5">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleClose()} 
+              className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all"
+            >
+              BATAL
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saving} 
+              className="flex-[1.5] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {saving ? 'SAVING...' : 'SIMPAN'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -439,16 +578,21 @@ function EditSantriModal({ santri, onClose, onSave }: { santri: SantriDB; onClos
 }
 
 // ── ADD SANTRI MODAL ──────────────────
-function AddSantriModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ id: '', no: 0, nama: '', tempat_lahir: '', tanggal_lahir: '', kelas: 'neutrino' as const, jabatan: 'anggota', instagram: '', wa: '', quote: '', link: '' });
+function AddSantriModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | null; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({ id: '', no: 0, nama: '', tempat_lahir: '', tanggal_lahir: '', kelas: (scopeKelas ?? 'neutrino') as any, jabatan: 'anggota', instagram: '', wa: '', quote: '', link: '' });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     if (!form.nama || !form.tempat_lahir || !form.tanggal_lahir) { toast.error('Isi data lengkap!'); return; }
     setSaving(true);
     const id = form.kelas === 'neutrino' ? `n-${String(form.no).padStart(2,'0')}` : `a-${String(form.no).padStart(2,'0')}`;
-    const { error } = await supabase.from('santri').insert({ ...form, id });
-    if (error) { toast.error('Gagal: ' + error.message); setSaving(false); return; }
+    try {
+      await callAdminContent('POST', { resource: 'santri', data: { ...form, id } });
+    } catch (err: any) {
+      toast.error('Gagal: ' + (err?.message || ''));
+      setSaving(false);
+      return;
+    }
     toast.success('Santri ditambahkan!');
     setSaving(false);
     onSave();
@@ -463,7 +607,13 @@ function AddSantriModal({ onClose, onSave }: { onClose: () => void; onSave: () =
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="section-label text-[10px] block mb-2">Kelas</label><select value={form.kelas} onChange={e => setForm(f=>({...f,kelas:e.target.value as any}))} className="admin-select"><option value="neutrino">Neutrino</option><option value="all-axe">All Axe</option></select></div>
+            <div>
+              <label className="section-label text-[10px] block mb-2">Kelas</label>
+              <select value={scopeKelas ?? form.kelas} onChange={e => setForm(f=>({...f,kelas:e.target.value as any}))} className="admin-select" disabled={!!scopeKelas}>
+                <option value="neutrino">Neutrino</option>
+                <option value="all-axe">All Axe</option>
+              </select>
+            </div>
           </div>
           <div><label className="section-label text-[10px] block mb-2">Nama Lengkap</label><input value={form.nama} onChange={e => setForm(f=>({...f,nama:e.target.value}))} className="admin-input" /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -478,8 +628,8 @@ function AddSantriModal({ onClose, onSave }: { onClose: () => void; onSave: () =
           <div><label className="section-label text-[10px] block mb-2">Link Card</label><input value={form.link} onChange={e => setForm(f=>({...f,link:e.target.value}))} placeholder="https://..." className="admin-input" /></div>
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="admin-btn admin-btn-ghost flex-1 py-2.5 justify-center">Batal</button>
-          <button onClick={handleSave} disabled={saving} className="admin-btn admin-btn-primary flex-1 py-2.5 justify-center">{saving ? 'Menyimpan...' : '+ Tambah'}</button>
+          <button onClick={onClose} className="admin-btn admin-btn-ghost flex-1 py-2.5 justify-center btn-press-active">Batal</button>
+          <button onClick={handleSave} disabled={saving} className={`admin-btn admin-btn-primary flex-1 py-2.5 justify-center btn-press-active ${saving ? 'btn-loading-shimmer opacity-80' : ''}`}>{saving ? 'Menyimpan...' : '+ Tambah'}</button>
         </div>
       </div>
     </div>
@@ -487,13 +637,20 @@ function AddSantriModal({ onClose, onSave }: { onClose: () => void; onSave: () =
 }
 
 // ── GURU TAB ──────────────────────────
-function GuruTab() {
+function GuruTab({ scopeKelas }: { scopeKelas: string | null }) {
   const [guru, setGuru] = useState<GuruDB[]>([]);
   const [editModal, setEditModal] = useState<GuruDB|null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchGuru(); }, []);
-  const fetchGuru = async () => { setLoading(true); const {data} = await supabase.from('guru').select('*'); if(data) setGuru(data as GuruDB[]); setLoading(false); };
+  const fetchGuru = async () => {
+    setLoading(true);
+    let query = supabase.from('guru').select('*');
+    if (scopeKelas) query = query.or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`);
+    const { data } = await query;
+    if (data) setGuru(data as GuruDB[]);
+    setLoading(false);
+  };
 
   return (
     <div>
@@ -506,7 +663,7 @@ function GuruTab() {
               <h3 className="font-display text-cream font-bold">{g.nama}</h3>
               <p className="text-gold/70 text-xs">{g.jabatan_guru} · {g.kelas}</p>
             </div>
-            <button onClick={() => setEditModal(g)} className="admin-btn admin-btn-ghost text-xs">Edit</button>
+            <button onClick={() => setEditModal(g)} className="admin-btn admin-btn-ghost text-xs btn-press-active">Edit</button>
           </div>
         ))}
       </div>
@@ -515,51 +672,153 @@ function GuruTab() {
   );
 }
 
-function EditGuruModal({ guru, onClose, onSave }: { guru: GuruDB; onClose: ()=>void; onSave: ()=>void }) {
-  const [form, setForm] = useState({...guru});
+function EditGuruModal({ guru, onClose, onSave }: { guru: GuruDB; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({ ...guru });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
 
   const handleSave = async () => {
     setSaving(true);
-    const {id, created_at, updated_at, ...updates} = form;
-    const { error } = await supabase.from('guru').update(updates).eq('id', guru.id);
-    if (error) { toast.error('Gagal: ' + error.message); setSaving(false); return; }
-    toast.success('Data guru diperbarui!'); setSaving(false); onSave();
+    const { id, created_at, updated_at, ...updates } = form;
+    try {
+      await callAdminContent('PATCH', { resource: 'guru', id: guru.id, updates });
+      toast.success('Data guru diperbarui!');
+      handleClose(true);
+    } catch (err: any) {
+      toast.error('Gagal: ' + (err?.message || ''));
+    }
+    setSaving(false);
   };
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if(!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
     try {
       const url = await uploadPhoto(file, `guru/${guru.id}_${Date.now()}.${file.name.split('.').pop()}`);
-      setForm(f=>({...f,foto:url})); toast.success('Foto diupload!');
+      setForm(f => ({ ...f, foto: url }));
+      toast.success('Foto diupload!');
     } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
     setUploading(false);
   };
 
   return (
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div className="admin-modal max-w-lg" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-display text-cream text-lg font-bold">Edit: {guru.nama}</h3>
-          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl">×</button>
-        </div>
-        <div className="space-y-3 sm:space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-          <div className="flex items-center gap-3 sm:gap-4">
-            {form.foto ? <img src={form.foto} className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border border-gold/20" /> : <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full skeleton" />}
-            <label className={`admin-btn admin-btn-ghost text-xs cursor-pointer ${uploading?'opacity-50':''}`}>{uploading?'Uploading...':'📷 Ganti Foto'}<input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} /></label>
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} 
+        onClick={() => handleClose()}
+      />
+      
+      {/* Modal Card */}
+      <div className={`relative w-full max-w-lg bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        {/* Decorative elements */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-5 py-4 border-b border-white/5 opacity-0 animate-fade-in-fast animate-stagger-1">
+          <div>
+            <h3 className="font-display text-cream text-base font-bold leading-tight">Edit Wali: {guru.nama}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="w-5 h-[1px] bg-gold/30" />
+              <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading">Data Tenaga Pendidik</p>
+            </div>
           </div>
-          <div><label className="section-label text-[10px] block mb-2">Nama</label><input value={form.nama} onChange={e=>setForm(f=>({...f,nama:e.target.value}))} className="admin-input" /></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="section-label text-[10px] block mb-2">Instagram</label><input value={form.instagram||''} onChange={e=>setForm(f=>({...f,instagram:e.target.value}))} className="admin-input" placeholder="username" /></div>
-            <div><label className="section-label text-[10px] block mb-2">WhatsApp</label><input value={form.wa||''} onChange={e=>setForm(f=>({...f,wa:e.target.value}))} className="admin-input" placeholder="08xxx atau +62xxx" /></div>
-          </div>
-          <div><label className="section-label text-[10px] block mb-2">Deskripsi</label><textarea value={form.deskripsi||''} onChange={e=>setForm(f=>({...f,deskripsi:e.target.value}))} rows={3} className="admin-input resize-none" /></div>
+          <button 
+            onClick={() => handleClose()} 
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white hover:bg-red-500/20 transition-all duration-300"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="admin-btn admin-btn-ghost flex-1 py-2.5 justify-center">Batal</button>
-          <button onClick={handleSave} disabled={saving} className="admin-btn admin-btn-primary flex-1 py-2.5 justify-center">{saving?'Menyimpan...':'💾 Simpan'}</button>
+
+        {/* Body */}
+        <div className="relative flex-1 overflow-y-auto p-5 pt-4 custom-scrollbar">
+          <div className="space-y-6">
+            {/* Photo Section */}
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-2">
+              <label className="section-label text-[8px] block mb-2 uppercase tracking-[0.2em] font-bold">Foto Profil</label>
+              <div className="flex items-center gap-4">
+                <div className="relative group">
+                  {form.foto ? (
+                    <img src={form.foto} className="w-16 h-16 rounded-full object-cover border border-gold/30 shadow-lg shadow-gold/5" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-cream/20">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <label className={`admin-btn bg-white/5 border border-white/10 hover:border-gold/30 text-[9px] py-1.5 px-3 cursor-pointer transition-all btn-press-active ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {uploading ? 'UPLOADING...' : '📷 GANTI FOTO'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={uploading} />
+                </label>
+              </div>
+            </div>
+
+            {/* Basic Info */}
+            <div className="space-y-4 opacity-0 animate-fade-in-fast animate-stagger-3">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Nama Lengkap</label>
+                <input value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} className="admin-input text-xs py-2" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Instagram</label>
+                  <input value={form.instagram || ''} onChange={e => setForm(f => ({ ...f, instagram: e.target.value }))} className="admin-input text-xs py-2" placeholder="username" />
+                </div>
+                <div>
+                  <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">WhatsApp</label>
+                  <input value={form.wa || ''} onChange={e => setForm(f => ({ ...f, wa: e.target.value }))} className="admin-input text-xs py-2" placeholder="08xxx" />
+                </div>
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Deskripsi / Moto</label>
+                <textarea value={form.deskripsi || ''} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} rows={3} className="admin-input resize-none text-xs py-2" placeholder="Kata-kata mutiara..." />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="relative p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md opacity-0 animate-fade-in-fast animate-stagger-5">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleClose()} 
+              className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all btn-press-active"
+            >
+              BATAL
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saving} 
+              className={`flex-[1.5] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 transition-all btn-press-active ${saving ? 'btn-loading-shimmer opacity-80' : ''}`}
+            >
+              {saving ? 'SAVING...' : 'SIMPAN'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -567,103 +826,268 @@ function EditGuruModal({ guru, onClose, onSave }: { guru: GuruDB; onClose: ()=>v
 }
 
 // ── GALLERY TAB ───────────────────────
-function GalleryTab() {
+function GalleryTab({ scopeKelas }: { scopeKelas: string | null }) {
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => { fetchGallery(); }, []);
-  const fetchGallery = async () => { setLoading(true); const {data} = await supabase.from('gallery').select('*').order('created_at',{ascending:false}); if(data) setGallery(data as GalleryItem[]); setLoading(false); };
-
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File|null>(null);
-  const [uploadPreview, setUploadPreview] = useState('');
-  const [caption, setCaption] = useState('');
-  const [article, setArticle] = useState('');
-  const [category, setCategory] = useState('momen');
-  const [kelas, setKelas] = useState('all');
-  const [uploading, setUploading] = useState(false);
-
-  const handleUpload = async () => {
-    if(!uploadFile){toast.error('Pilih foto!');return;}
-    setUploading(true);
-    try {
-      const url = await uploadPhoto(uploadFile, `gallery/${Date.now()}.${uploadFile.name.split('.').pop()}`);
-      const { error } = await supabase.from('gallery').insert({ url, caption, article_text:article||null, category, kelas, submitted_name:'Admin', submitted_by:user?.id });
-      if (error) throw error;
-      toast.success('Foto diupload!'); fetchGallery(); setShowUpload(false); setUploadFile(null); setUploadPreview(''); setCaption(''); setArticle('');
-    } catch (err: any) { toast.error('Gagal upload: ' + (err?.message || 'Cek koneksi dan storage bucket')); }
-    setUploading(false);
+  const fetchGallery = async (background = false) => {
+    if (!background) setLoading(true);
+    let query = supabase.from('gallery').select('*').order('created_at', { ascending: false });
+    if (scopeKelas) query = query.or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`);
+    const { data } = await query;
+    if (data) setGallery(data as GalleryItem[]);
+    setLoading(false);
   };
 
   const handleDelete = async (id: string, url: string) => {
-    if(!confirm('Hapus foto ini? Foto ini juga akan dihapus dari storage.')) return;
-    await supabase.from('gallery').delete().eq('id',id); 
-    if (url) await deleteFileFromStorage(url);
-    setGallery(g=>g.filter(x=>x.id!==id)); 
-    toast.success('Dihapus');
+    if (!confirm('Hapus foto ini? Foto ini juga akan dihapus dari storage.')) return;
+    try {
+      await callAdminContent('DELETE', { resource: 'gallery', id });
+      if (url) await deleteFileFromStorage(url);
+      setGallery(g => g.filter(x => x.id !== id));
+      toast.success('Dihapus');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menghapus');
+    }
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-display text-cream text-xl font-bold">Gallery ({gallery.length})</h2>
-        <button onClick={()=>setShowUpload(!showUpload)} className="admin-btn admin-btn-primary text-xs">+ Upload Foto</button>
+        <button 
+          onClick={() => setShowAdd(true)} 
+          className="admin-btn admin-btn-primary text-xs btn-press-active"
+        >
+          + Upload Foto
+        </button>
       </div>
 
-      {showUpload && (
-        <div className="card-dark p-6 mb-6">
-          <div className="space-y-4">
-            {uploadPreview ? (
-              <div className="relative rounded-lg overflow-hidden border border-gold/20 max-h-48"><img src={uploadPreview} className="w-full object-cover max-h-48" /><button onClick={()=>{setUploadFile(null);setUploadPreview('');}} className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">×</button></div>
-            ) : (
-              <label className="flex flex-col items-center py-8 border-2 border-dashed border-gold/20 rounded-lg cursor-pointer hover:border-gold/40"><span className="text-2xl mb-1">📷</span><span className="text-cream/40 text-xs">Pilih foto (max 50MB)</span><input type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f){setUploadFile(f);const r=new FileReader();r.onload=()=>setUploadPreview(r.result as string);r.readAsDataURL(f);}}} /></label>
-            )}
-            <input value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Caption..." className="admin-input" />
-            <textarea value={article} onChange={e=>setArticle(e.target.value)} placeholder="Artikel / cerita (opsional)..." rows={3} className="admin-input resize-none" />
-            <div className="grid grid-cols-2 gap-3">
-              <select value={category} onChange={e=>setCategory(e.target.value)} className="admin-select"><option value="momen">Momen</option><option value="rihlah">Rihlah</option><option value="wisuda">Wisuda</option><option value="neutrino">Neutrino</option><option value="all-axe">All Axe</option><option value="keseharian">Keseharian</option></select>
-              <select value={kelas} onChange={e=>setKelas(e.target.value)} className="admin-select"><option value="all">Semua</option><option value="neutrino">Neutrino</option><option value="all-axe">All Axe</option></select>
-            </div>
-            <button onClick={handleUpload} disabled={uploading} className="admin-btn admin-btn-primary w-full py-2.5 justify-center">{uploading?'⏳ Uploading...':'📸 Upload'}</button>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {gallery.map(g => (
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-40 rounded-lg" />)
+        ) : gallery.map(g => (
           <div key={g.id} className="relative group rounded-lg overflow-hidden border border-gold/10">
             <img src={g.url} className="w-full h-40 object-cover" />
-            <div className="absolute inset-0 bg-charcoal-dark/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button onClick={()=>handleDelete(g.id, g.url)} className="admin-btn admin-btn-danger text-xs">🗑 Hapus</button>
+            <div className="absolute inset-0 bg-charcoal-dark/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+              <button onClick={() => handleDelete(g.id, g.url)} className="admin-btn admin-btn-danger text-xs btn-press-active">🗑 Hapus</button>
             </div>
-            <div className="p-2"><p className="text-cream/70 text-[10px] truncate">{g.caption||'—'}</p></div>
+            <div className="p-2 bg-charcoal-dark/50 backdrop-blur-md">
+              <p className="text-cream/70 text-[10px] truncate">{g.caption || '—'}</p>
+            </div>
           </div>
         ))}
+      </div>
+
+      {showAdd && (
+        <AddPhotoModal 
+          scopeKelas={scopeKelas} 
+          onClose={() => setShowAdd(false)} 
+          onSave={() => { setShowAdd(false); fetchGallery(true); }} 
+        />
+      )}
+    </div>
+  );
+}
+
+function AddPhotoModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | null; onClose: () => void; onSave: () => void }) {
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState('');
+  const [caption, setCaption] = useState('');
+  const [article, setArticle] = useState('');
+  const [category, setCategory] = useState('momen');
+  const [kelas, setKelas] = useState(scopeKelas ?? 'all');
+  const [uploading, setUploading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
+
+  const allowedCategories = scopeKelas
+    ? ['momen', 'rihlah', 'wisuda', 'keseharian', scopeKelas]
+    : ['momen', 'rihlah', 'wisuda', 'neutrino', 'all-axe', 'keseharian'];
+
+  const handleUpload = async () => {
+    if (!uploadFile) { toast.error('Pilih foto!'); return; }
+    setUploading(true);
+    try {
+      const url = await uploadPhoto(uploadFile, `gallery/${Date.now()}.${uploadFile.name.split('.').pop()}`);
+      await callAdminContent('POST', {
+        resource: 'gallery',
+        data: { url, caption, article_text: article || null, category, kelas: scopeKelas ?? kelas, submitted_name: 'Admin', submitted_by: user?.id },
+      });
+      toast.success('Foto diupload!');
+      handleClose(true);
+    } catch (err: any) {
+      toast.error('Gagal upload: ' + (err?.message || 'Cek koneksi dan storage bucket'));
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      <div 
+        className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} 
+        onClick={() => handleClose()}
+      />
+      
+      <div className={`relative w-full max-w-lg bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        <div className="relative flex items-center justify-between px-5 py-4 border-b border-white/5">
+          <div>
+            <h3 className="font-display text-cream text-base font-bold leading-tight">Upload Foto Gallery</h3>
+            <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading mt-0.5">Tambah Kenangan Baru</p>
+          </div>
+          <button onClick={() => handleClose()} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white transition-all">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="relative flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+          {/* Photo Picker */}
+          <div className="opacity-0 animate-fade-in-fast animate-stagger-1">
+            {uploadPreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-gold/20 shadow-xl group">
+                <img src={uploadPreview} className="w-full h-48 object-cover" />
+                <button 
+                  onClick={() => { setUploadFile(null); setUploadPreview(''); }} 
+                  className="absolute top-3 right-3 w-8 h-8 bg-black/60 backdrop-blur-md rounded-full text-white flex items-center justify-center hover:bg-red-500 transition-all btn-press-active"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center py-12 border-2 border-dashed border-gold/10 hover:border-gold/30 rounded-2xl cursor-pointer transition-all bg-white/[0.02] group btn-press-active">
+                <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center text-gold mb-3 group-hover:scale-110 transition-transform">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <span className="text-cream/50 text-xs font-heading tracking-wider">PILIH FOTO</span>
+                <span className="text-cream/20 text-[9px] mt-1">PNG, JPG, WEBP (Max 50MB)</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setUploadFile(f);
+                      const r = new FileReader();
+                      r.onload = () => setUploadPreview(r.result as string);
+                      r.readAsDataURL(f);
+                    }
+                  }} 
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Form Fields */}
+          <div className="space-y-4 opacity-0 animate-fade-in-fast animate-stagger-2">
+            <div>
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Caption Foto</label>
+              <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Judul momen..." className="admin-input text-xs py-2" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Kategori</label>
+                <select value={category} onChange={e => setCategory(e.target.value)} className="admin-select text-xs py-2">
+                  {allowedCategories.map(cat => (
+                    <option key={cat} value={cat} className="capitalize">{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Target Kelas</label>
+                <select value={scopeKelas ?? kelas} onChange={e => setKelas(e.target.value)} className="admin-select text-xs py-2" disabled={!!scopeKelas}>
+                  <option value="all">Semua Kelas</option>
+                  <option value="neutrino">Neutrino</option>
+                  <option value="all-axe">All Axe</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Cerita / Artikel (Opsional)</label>
+              <textarea value={article} onChange={e => setArticle(e.target.value)} placeholder="Ceritakan detail momen ini..." rows={3} className="admin-input resize-none text-xs py-2" />
+            </div>
+          </div>
+        </div>
+
+        <div className="relative p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleClose()} 
+              className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all btn-press-active"
+            >
+              BATAL
+            </button>
+            <button 
+              onClick={handleUpload} 
+              disabled={uploading} 
+              className={`flex-[1.5] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 transition-all btn-press-active ${uploading ? 'btn-loading-shimmer opacity-80' : ''}`}
+            >
+              {uploading ? 'UPLOADING...' : 'PUBLISH FOTO'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 // ── SUBMISSIONS TAB ───────────────────
-function SubmissionsTab({ onUpdate }: { onUpdate: () => void }) {
+function SubmissionsTab({ onUpdate, scopeKelas }: { onUpdate: () => void; scopeKelas: string | null }) {
   const [subs, setSubs] = useState<GallerySubmission[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchSubs(); }, []);
-  const fetchSubs = async () => { setLoading(true); const {data} = await supabase.from('gallery_submissions').select('*').order('created_at',{ascending:false}); if(data) setSubs(data as GallerySubmission[]); setLoading(false); };
+  const fetchSubs = async () => {
+    setLoading(true);
+    let query = supabase.from('gallery_submissions').select('*').order('created_at', { ascending: false });
+    if (scopeKelas) query = query.or(`kelas.eq.${scopeKelas},kelas.eq.all,kelas.eq.both`);
+    const { data } = await query;
+    if (data) setSubs(data as GallerySubmission[]);
+    setLoading(false);
+  };
 
   const handleApprove = async (sub: GallerySubmission) => {
     try {
-      await supabase.from('gallery').insert({ url:sub.url, caption:sub.caption, article_text:sub.article_text, category:sub.category, kelas:sub.kelas, submitted_by:sub.submitted_by, submitted_name:sub.submitted_name });
-      await supabase.from('gallery_submissions').update({status:'approved'}).eq('id',sub.id);
+      await callAdminContent('POST', {
+        resource: 'gallery',
+        data: { url:sub.url, caption:sub.caption, article_text:sub.article_text, category:sub.category, kelas:sub.kelas, submitted_by:sub.submitted_by, submitted_name:sub.submitted_name },
+      });
+      await callAdminContent('PATCH', { resource: 'submission', id: sub.id, status: 'approved' });
       toast.success('Foto disetujui! ✅'); fetchSubs(); onUpdate();
     } catch { toast.error('Gagal'); }
   };
 
   const handleReject = async (id: string) => {
-    await supabase.from('gallery_submissions').update({status:'rejected'}).eq('id',id);
-    toast.success('Ditolak'); fetchSubs(); onUpdate();
+    try {
+      await callAdminContent('PATCH', { resource: 'submission', id, status: 'rejected' });
+      toast.success('Ditolak'); fetchSubs(); onUpdate();
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menolak');
+    }
   };
 
   const pending = subs.filter(s => s.status === 'pending');
@@ -684,8 +1108,8 @@ function SubmissionsTab({ onUpdate }: { onUpdate: () => void }) {
                 <p className="text-cream/40 text-xs mt-1">oleh {sub.submitted_name} · {new Date(sub.created_at).toLocaleDateString('id-ID')}</p>
                 {sub.article_text && <p className="text-cream/50 text-xs mt-2 line-clamp-3">{sub.article_text}</p>}
                 <div className="flex gap-2 mt-4">
-                  <button onClick={() => handleApprove(sub)} className="admin-btn admin-btn-success text-xs">✅ Setujui</button>
-                  <button onClick={() => handleReject(sub.id)} className="admin-btn admin-btn-danger text-xs">❌ Tolak</button>
+                  <button onClick={() => handleApprove(sub)} className="admin-btn admin-btn-success text-xs btn-press-active">✅ Setujui</button>
+                  <button onClick={() => handleReject(sub.id)} className="admin-btn admin-btn-danger text-xs btn-press-active">❌ Tolak</button>
                 </div>
               </div>
             </div>
@@ -711,10 +1135,26 @@ function SubmissionsTab({ onUpdate }: { onUpdate: () => void }) {
 }
 
 // ── NOTES TAB ─────────────────────────
-function NotesTab() {
-  const [notes, setNotes] = useState<{id:string;user_name:string;content:string;created_at:string}[]>([]);
-  useEffect(() => { supabase.from('sticky_notes').select('*').order('created_at',{ascending:false}).then(({data})=>{if(data) setNotes(data as typeof notes);}); }, []);
-  const deleteNote = async (id: string) => { await supabase.from('sticky_notes').delete().eq('id',id); setNotes(n=>n.filter(x=>x.id!==id)); toast.success('Dihapus'); };
+function NotesTab({ scopeKelas }: { scopeKelas: string | null }) {
+  const [notes, setNotes] = useState<{id:string;user_name:string;content:string;created_at:string;kelas?:string}[]>([]);
+
+  const fetchNotes = async () => {
+    let query = supabase.from('sticky_notes').select('*').order('created_at',{ascending:false});
+    if (scopeKelas) query = query.or(`kelas.eq.${scopeKelas},kelas.eq.general,kelas.eq.both`);
+    const { data } = await query;
+    if (data) setNotes(data as typeof notes);
+  };
+
+  useEffect(() => { fetchNotes(); }, [scopeKelas]);
+  const deleteNote = async (id: string) => {
+    try {
+      await callAdminContent('DELETE', { resource: 'note', id });
+      setNotes(n=>n.filter(x=>x.id!==id));
+      toast.success('Dihapus');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menghapus');
+    }
+  };
   return (
     <div>
       <h2 className="font-display text-cream text-xl font-bold mb-6">Quote Wall ({notes.length})</h2>
@@ -736,65 +1176,318 @@ function NotesTab() {
 }
 
 // ── PLAYLIST TAB ──────────────────────
-function PlaylistTab() {
-  const [tracks, setTracks] = useState<{id:string;title:string;artist:string;url:string}[]>([]);
-  const [title, setTitle] = useState(''); const [artist, setArtist] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [audioFile, setAudioFile] = useState<File|null>(null);
+import { motion, AnimatePresence } from 'framer-motion';
 
-  useEffect(() => { supabase.from('playlist').select('*').order('order_num').then(({data})=>{if(data) setTracks(data as typeof tracks);}); }, []);
+function PlaylistTab({ scopeKelas }: { scopeKelas: string | null }) {
+  const [tracks, setTracks] = useState<{ id: string; title: string; artist: string; url: string; order_num: number; kelas?: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<any>(null);
 
-  const handleAdd = async () => {
-    if(!title) {toast.error('Isi judul!');return;}
-    if(!audioFile) {toast.error('Pilih file audio!');return;}
-    setUploading(true);
-    try {
-      const url = await uploadPhoto(audioFile, `playlist/${Date.now()}_${audioFile.name}`);
-      const { error } = await supabase.from('playlist').insert({title, artist:artist||'Angkatan 26', url, order_num:tracks.length + 1});
-      if (error) throw error;
-      toast.success('Lagu ditambahkan!');
-      const {data} = await supabase.from('playlist').select('*').order('order_num');
-      if(data) setTracks(data as typeof tracks);
-      setTitle(''); setArtist(''); setAudioFile(null);
-    } catch (err: any) { toast.error('Gagal: ' + (err?.message || 'Cek storage bucket')); }
-    setUploading(false);
+  const fetchTracks = async (background = false) => {
+    if (!background) setLoading(true);
+    const { data } = await supabase.from('playlist').select('*').order('order_num', { ascending: true });
+    if (data) setTracks(data as any[]);
+    setLoading(false);
   };
 
+  useEffect(() => { fetchTracks(); }, [scopeKelas]);
+
   const handleDelete = async (id: string, url: string) => {
-    if(!confirm('Hapus lagu ini? File audio juga akan dihapus dari storage.')) return;
-    await supabase.from('playlist').delete().eq('id',id);
-    if (url) await deleteFileFromStorage(url);
-    setTracks(t=>t.filter(x=>x.id!==id)); 
-    toast.success('Dihapus');
+    if (!confirm('Hapus lagu ini? File audio juga akan dihapus dari storage.')) return;
+    try {
+      await callAdminContent('DELETE', { resource: 'playlist', id });
+      if (url) await deleteFileFromStorage(url);
+      setTracks(t => t.filter(x => x.id !== id));
+      toast.success('Dihapus');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menghapus');
+    }
+  };
+
+  const handleMove = async (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= tracks.length) return;
+
+    const newTracks = [...tracks];
+    const temp = newTracks[index].order_num;
+    newTracks[index].order_num = newTracks[newIndex].order_num;
+    newTracks[newIndex].order_num = temp;
+
+    // Swap positions for UI feel
+    const item = newTracks.splice(index, 1)[0];
+    newTracks.splice(newIndex, 0, item);
+    setTracks(newTracks);
+
+    try {
+      await Promise.all([
+        supabase.from('playlist').update({ order_num: newTracks[index].order_num }).eq('id', newTracks[index].id),
+        supabase.from('playlist').update({ order_num: newTracks[newIndex].order_num }).eq('id', newTracks[newIndex].id)
+      ]);
+    } catch (err) {
+      toast.error('Gagal merubah urutan');
+      fetchTracks(true);
+    }
   };
 
   return (
     <div>
-      <h2 className="font-display text-cream text-xl font-bold mb-6">Playlist Musik</h2>
-      <div className="card-dark p-6 max-w-lg mb-8">
-        <h3 className="text-cream text-sm font-display font-bold mb-4">Tambah Lagu</h3>
-        <div className="space-y-3">
-          <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Judul lagu..." className="admin-input" />
-          <input value={artist} onChange={e=>setArtist(e.target.value)} placeholder="Artis..." className="admin-input" />
-          <label className="admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center">
-            {audioFile ? `🎵 ${audioFile.name}` : '🎵 Pilih File Audio (MP3/WAV)'}
-            <input type="file" accept="audio/*" className="hidden" onChange={e=>{if(e.target.files?.[0]) setAudioFile(e.target.files[0]);}} />
-          </label>
-          <button onClick={handleAdd} disabled={uploading} className="admin-btn admin-btn-primary w-full py-2.5 justify-center">{uploading?'⏳ Mengupload...':'+ Tambah Lagu'}</button>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-cream text-xl font-bold">Playlist Musik</h2>
+          <p className="text-cream/40 text-xs font-body">Atur urutan lagu untuk player utama</p>
+        </div>
+        <button 
+          onClick={() => setShowAdd(true)} 
+          className="admin-btn admin-btn-primary text-xs btn-press-active"
+        >
+          + Tambah Lagu
+        </button>
+      </div>
+
+      <div className="max-w-2xl">
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}
+          </div>
+        ) : tracks.length === 0 ? (
+          <div className="card-dark p-8 text-center text-cream/30 border-dashed border-white/10">
+            <p>Belum ada lagu di playlist.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
+              {tracks.map((t, i) => (
+                <motion.div 
+                  key={t.id} 
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ 
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 30,
+                    layout: { duration: 0.4 }
+                  }}
+                  className="card-dark p-3 flex items-center gap-4 group hover:border-gold/30 transition-all relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gold/0 group-hover:bg-gold/[0.02] transition-colors pointer-events-none" />
+
+                  <div className="flex flex-col gap-1.5 shrink-0 z-10">
+                    <button 
+                      onClick={() => handleMove(i, 'up')} 
+                      disabled={i === 0}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-cream/20 hover:text-gold hover:bg-gold/20 hover:scale-110 disabled:opacity-0 transition-all btn-press-active border border-white/5 hover:border-gold/30"
+                      title="Pindahkan ke atas"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => handleMove(i, 'down')} 
+                      disabled={i === tracks.length - 1}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 text-cream/20 hover:text-gold hover:bg-gold/20 hover:scale-110 disabled:opacity-0 transition-all btn-press-active border border-white/5 hover:border-gold/30"
+                      title="Pindahkan ke bawah"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-gold border border-white/5 group-hover:border-gold/30 group-hover:bg-gold/10 transition-all shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                  </div>
+
+                  <div className="flex-1 min-w-0 z-10">
+                    <div className="text-cream text-sm font-display font-bold truncate group-hover:text-gold transition-colors">{t.title}</div>
+                    <div className="text-cream/40 text-[9px] uppercase tracking-[0.2em] font-heading mt-0.5">{t.artist}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 z-10">
+                    <button 
+                      onClick={() => setEditingTrack(t)}
+                      className="p-2.5 rounded-xl bg-white/5 text-cream/40 hover:text-cream hover:bg-white/10 transition-all btn-press-active border border-white/5"
+                      title="Edit Nama/Artis"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(t.id, t.url)}
+                      className="p-2.5 rounded-xl bg-red-500/5 text-red-500/40 hover:text-red-500 hover:bg-red-500/20 transition-all btn-press-active border border-red-500/10"
+                      title="Hapus Lagu"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
+      {showAdd && (
+        <AddMusicModal 
+          scopeKelas={scopeKelas}
+          nextOrder={tracks.length + 1}
+          onClose={() => setShowAdd(false)}
+          onSave={() => { setShowAdd(false); fetchTracks(true); }}
+        />
+      )}
+
+      {editingTrack && (
+        <EditMusicModal 
+          track={editingTrack}
+          onClose={() => setEditingTrack(null)}
+          onSave={() => { setEditingTrack(null); fetchTracks(true); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddMusicModal({ scopeKelas, nextOrder, onClose, onSave }: { scopeKelas: string | null; nextOrder: number; onClose: () => void; onSave: () => void }) {
+  const [title, setTitle] = useState('');
+  const [artist, setArtist] = useState('');
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
+
+  const handleAdd = async () => {
+    if (!title) { toast.error('Isi judul!'); return; }
+    if (!audioFile) { toast.error('Pilih file audio!'); return; }
+    setUploading(true);
+    try {
+      const url = await uploadPhoto(audioFile, `playlist/${Date.now()}_${audioFile.name}`);
+      await callAdminContent('POST', {
+        resource: 'playlist',
+        data: {
+          title,
+          artist: artist || 'Angkatan 26',
+          url,
+          kelas: scopeKelas ?? 'all',
+          order_num: nextOrder,
+        },
+      });
+      toast.success('Lagu ditambahkan!');
+      handleClose(true);
+    } catch (err: any) { toast.error('Gagal: ' + (err?.message || 'Cek storage bucket')); }
+    setUploading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} onClick={() => handleClose()} />
+      <div className={`relative w-full max-w-md bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-cream text-base font-bold">Tambah Musik</h3>
+            <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading mt-0.5">Background Player</p>
+          </div>
+          <button onClick={() => handleClose()} className="text-cream/30 hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Judul Lagu</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Misal: Laskar Pelangi" className="admin-input text-xs py-2" />
+          </div>
+          <div>
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Nama Artis</label>
+            <input value={artist} onChange={e => setArtist(e.target.value)} placeholder="Misal: Nidji" className="admin-input text-xs py-2" />
+          </div>
+          <div>
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">File Audio</label>
+            <label className="flex flex-col items-center py-6 border-2 border-dashed border-gold/10 hover:border-gold/30 rounded-xl cursor-pointer transition-all bg-white/[0.02] btn-press-active">
+              <svg className="w-8 h-8 text-gold/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" /></svg>
+              <span className="text-cream/50 text-[10px] font-heading">{audioFile ? audioFile.name : 'PILIH FILE MP3/WAV'}</span>
+              <input type="file" accept="audio/*" className="hidden" onChange={e => { if (e.target.files?.[0]) setAudioFile(e.target.files[0]); }} />
+            </label>
+          </div>
+        </div>
+        <div className="p-5 pt-0">
+          <button onClick={handleAdd} disabled={uploading} className={`admin-btn admin-btn-primary w-full py-2.5 justify-center btn-press-active ${uploading ? 'btn-loading-shimmer' : ''}`}>
+            {uploading ? 'UPLOADING...' : 'TAMBAH KE PLAYLIST'}
+          </button>
         </div>
       </div>
-      <div className="space-y-2 max-w-lg">
-        {tracks.map((t,i) => (
-          <div key={t.id} className="card-dark p-3 flex items-center gap-3">
-            <span className="text-gold/40 text-xs font-mono w-6">{i+1}</span>
-            <div className="flex-1">
-              <div className="text-cream text-sm font-display font-bold">{t.title}</div>
-              <div className="text-cream/40 text-[10px]">{t.artist}</div>
-            </div>
-            {t.url && <audio controls src={t.url} className="h-7 max-w-[120px]" />}
-            <button onClick={()=>handleDelete(t.id, t.url)} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">🗑</button>
+    </div>
+  );
+}
+
+function EditMusicModal({ track, onClose, onSave }: { track: any; onClose: () => void; onSave: () => void }) {
+  const [title, setTitle] = useState(track.title);
+  const [artist, setArtist] = useState(track.artist);
+  const [saving, setSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await callAdminContent('PATCH', { resource: 'playlist', id: track.id, updates: { title, artist } });
+      toast.success('Lagu diperbarui!');
+      handleClose(true);
+    } catch (err: any) { toast.error('Gagal: ' + err.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} onClick={() => handleClose()} />
+      <div className={`relative w-full max-w-md bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+          <h3 className="font-display text-cream text-base font-bold">Edit Musik</h3>
+          <button onClick={() => handleClose()} className="text-cream/30 hover:text-white transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Judul Lagu</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} className="admin-input text-xs py-2" />
           </div>
-        ))}
+          <div>
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Nama Artis</label>
+            <input value={artist} onChange={e => setArtist(e.target.value)} className="admin-input text-xs py-2" />
+          </div>
+        </div>
+        <div className="p-5 pt-0">
+          <button onClick={handleSave} disabled={saving} className={`admin-btn admin-btn-primary w-full py-2.5 justify-center btn-press-active ${saving ? 'btn-loading-shimmer' : ''}`}>
+            {saving ? 'SAVING...' : 'SIMPAN PERUBAHAN'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -876,9 +1569,9 @@ function SettingsTab() {
               <span className="text-cream/30 text-xs">Menggunakan foto default</span>
             </div>
           )}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='neutrino_bg_url'?'opacity-50':''}`}>
-            {saving==='neutrino_bg_url'?'⏳ Uploading...':'📷 Upload Background Neutrino'}
-            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('neutrino_bg_url',e)} disabled={!!saving} />
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+            {saving === 'neutrino_bg_url' ? '⏳ Uploading...' : '📷 Upload Background Neutrino'}
+            <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_url', e)} disabled={!!saving} />
           </label>
         </div>
 
@@ -906,9 +1599,9 @@ function SettingsTab() {
               <span className="text-cream/30 text-xs">Menggunakan foto default</span>
             </div>
           )}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='allaxe_bg_url'?'opacity-50':''}`}>
-            {saving==='allaxe_bg_url'?'⏳ Uploading...':'📷 Upload Background All Axe'}
-            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('allaxe_bg_url',e)} disabled={!!saving} />
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'allaxe_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+            {saving === 'allaxe_bg_url' ? '⏳ Uploading...' : '📷 Upload Background All Axe'}
+            <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('allaxe_bg_url', e)} disabled={!!saving} />
           </label>
         </div>
 
@@ -934,9 +1627,9 @@ function SettingsTab() {
               <span className="text-cream/30 text-xs bg-charcoal-dark/50 px-3 py-1 rounded">Tidak ada foto kustom</span>
             </div>
           )}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center ${saving==='og_image_url'?'opacity-50':''}`}>
-            {saving==='og_image_url'?'⏳ Uploading...':'📷 Upload Foto Preview URL'}
-            <input type="file" accept="image/*" className="hidden" onChange={e=>handleUploadBg('og_image_url',e)} disabled={!!saving} />
+          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'og_image_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+            {saving === 'og_image_url' ? '⏳ Uploading...' : '📷 Upload Foto Preview URL'}
+            <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('og_image_url', e)} disabled={!!saving} />
           </label>
         </div>
       </div>
@@ -951,7 +1644,10 @@ type UserRow = {
   full_name: string;
   created_at: string;
   last_sign_in: string | null;
+  role: 'root' | 'manager_ikhwa' | 'manager_akhwat' | null;
   is_admin: boolean;
+  is_owner?: boolean;
+  is_hardcoded_root?: boolean;
   confirmed: boolean;
 };
 
@@ -961,22 +1657,23 @@ function UsersTab({ session }: { session: any }) {
   const [error, setError] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
 
-  // Form state
+  // Form state untuk user baru
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
-  const [makeAdmin, setMakeAdmin] = useState(false);
+  const [newRole, setNewRole] = useState<'root' | 'manager_ikhwa' | 'manager_akhwat' | null>(null);
   const [creating, setCreating] = useState(false);
 
   const getToken = async (): Promise<string> => {
-    // Refresh session jika perlu
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token || session?.access_token || '';
   };
 
-  const fetchUsers = async () => {
-    setLoading(true); setError('');
+  const fetchUsers = async (background = false) => {
+    if (!background) setLoading(true); 
+    setError('');
     try {
       const token = await getToken();
       const res = await fetch('/api/admin/users', {
@@ -989,6 +1686,15 @@ function UsersTab({ session }: { session: any }) {
     setLoading(false);
   };
 
+  useEffect(() => {
+    if (editingUser) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [editingUser]);
+
   useEffect(() => { fetchUsers(); }, []);
 
   const handleCreate = async () => {
@@ -999,44 +1705,35 @@ function UsersTab({ session }: { session: any }) {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: newEmail, password: newPassword, full_name: newName, make_admin: makeAdmin }),
+        body: JSON.stringify({ email: newEmail, password: newPassword, full_name: newName, role: newRole }),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error); setCreating(false); return; }
       toast.success(`Akun ${newEmail} berhasil dibuat!`);
-      setNewEmail(''); setNewPassword(''); setNewName(''); setMakeAdmin(false); setShowAdd(false);
+      setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole(null); setShowAdd(false);
       fetchUsers();
     } catch { toast.error('Gagal membuat akun'); }
     setCreating(false);
   };
 
-  const handleToggleAdmin = async (user: UserRow) => {
-    const action = user.is_admin ? 'Cabut akses admin' : 'Jadikan admin';
-    if (!confirm(`${action} untuk ${user.email}?`)) return;
-    const token = await getToken();
-    const res = await fetch('/api/admin/users', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ email: user.email, make_admin: !user.is_admin }),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast.error(data.error); return; }
-    toast.success(user.is_admin ? 'Akses admin dicabut' : 'Dijadikan admin ✅');
-    fetchUsers();
-  };
-
   const handleDelete = async (user: UserRow) => {
+    if (user.is_owner || user.is_hardcoded_root) {
+      toast.error('Akun root utama tidak dapat dihapus.');
+      return;
+    }
     if (!confirm(`Hapus akun ${user.email}? Tindakan ini tidak bisa dibatalkan!`)) return;
-    const token = await getToken();
-    const res = await fetch('/api/admin/users', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ user_id: user.id, email: user.email }),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast.error(data.error); return; }
-    toast.success('Akun dihapus');
-    fetchUsers();
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error); return; }
+      toast.success('Akun dihapus');
+      fetchUsers();
+    } catch { toast.error('Gagal menghapus akun'); }
   };
 
   const filtered = users.filter(u =>
@@ -1045,7 +1742,7 @@ function UsersTab({ session }: { session: any }) {
   );
 
   return (
-    <div>
+    <div className="animate-in fade-in duration-500">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h2 className="font-display text-cream text-xl font-bold">Manajemen Akun</h2>
@@ -1054,7 +1751,6 @@ function UsersTab({ session }: { session: any }) {
         <button onClick={() => setShowAdd(!showAdd)} className="admin-btn admin-btn-primary text-xs">+ Buat Akun Baru</button>
       </div>
 
-      {/* Error state for missing service key */}
       {error && (
         <div className="card-dark border border-red-500/30 p-5 mb-6 rounded-xl">
           <div className="flex items-start gap-3">
@@ -1062,25 +1758,14 @@ function UsersTab({ session }: { session: any }) {
             <div>
               <p className="text-red-400 font-heading text-sm font-bold mb-1">Tidak bisa memuat akun</p>
               <p className="text-cream/50 text-xs">{error}</p>
-              {error.includes('SERVICE_ROLE') || error.includes('dikonfigurasi') ? (
-                <div className="mt-3 p-3 bg-charcoal-dark rounded-lg border border-gold/20">
-                  <p className="text-gold text-xs font-heading mb-1">Cara memperbaiki:</p>
-                  <p className="text-cream/50 text-[11px]">1. Buka Supabase Dashboard → Project Settings → API</p>
-                  <p className="text-cream/50 text-[11px]">2. Copy <strong className="text-gold">service_role key</strong></p>
-                  <p className="text-cream/50 text-[11px]">3. Tambahkan ke <code className="text-gold">.env.local</code>:</p>
-                  <code className="block text-[10px] bg-black/40 p-2 rounded mt-1 text-green-400">SUPABASE_SERVICE_ROLE_KEY=eyJ...</code>
-                  <p className="text-cream/50 text-[11px] mt-1">4. Restart dev server</p>
-                </div>
-              ) : null}
             </div>
           </div>
           <button onClick={fetchUsers} className="admin-btn admin-btn-ghost text-xs mt-4">🔄 Coba Lagi</button>
         </div>
       )}
 
-      {/* Create new user form */}
       {showAdd && (
-        <div className="card-dark p-6 mb-6">
+        <div className="card-dark p-6 mb-6 border-l-2 border-gold animate-in slide-in-from-top-2 duration-300">
           <h3 className="text-cream text-sm font-display font-bold mb-4">Buat Akun Baru</h3>
           <div className="space-y-3 max-w-md">
             <div>
@@ -1095,18 +1780,18 @@ function UsersTab({ session }: { session: any }) {
               <label className="section-label text-[10px] block mb-1">Password</label>
               <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="Min. 6 karakter" className="admin-input" />
             </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                className={`w-10 h-5 rounded-full transition-all relative ${makeAdmin ? 'bg-gold' : 'bg-charcoal-dark border border-gold/20'}`}
-                onClick={() => setMakeAdmin(v => !v)}
-              >
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-cream transition-all ${makeAdmin ? 'left-5' : 'left-0.5'}`} />
-              </div>
-              <span className="text-cream/70 text-xs">Jadikan Admin</span>
-            </label>
+            <div>
+              <label className="section-label text-[10px] block mb-1">Role</label>
+              <select value={newRole ?? ''} onChange={e => setNewRole((e.target.value || null) as any)} className="admin-select">
+                <option value="">Santri (tanpa akses admin)</option>
+                <option value="manager_ikhwa">Manager (Ikhwa)</option>
+                <option value="manager_akhwat">Manager (Akhwat)</option>
+                <option value="root">Admin Root</option>
+              </select>
+            </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowAdd(false)} className="admin-btn admin-btn-ghost flex-1 py-2 justify-center text-xs">Batal</button>
-              <button onClick={handleCreate} disabled={creating} className="admin-btn admin-btn-primary flex-1 py-2 justify-center text-xs">
+              <button onClick={() => setShowAdd(false)} className="admin-btn admin-btn-ghost flex-1 py-2 justify-center text-xs btn-press-active">Batal</button>
+              <button onClick={handleCreate} disabled={creating} className={`admin-btn admin-btn-primary flex-1 py-2 justify-center text-xs btn-press-active ${creating ? 'btn-loading-shimmer opacity-80' : ''}`}>
                 {creating ? '⏳ Membuat...' : '+ Buat Akun'}
               </button>
             </div>
@@ -1115,7 +1800,18 @@ function UsersTab({ session }: { session: any }) {
       )}
 
       {/* Search */}
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari email / nama..." className="admin-input max-w-xs mb-4" />
+      <input 
+        type="search"
+        name="q_ref_v1"
+        id="q_ref_v1"
+        value={search} 
+        onChange={e=>setSearch(e.target.value)} 
+        placeholder="Cari email / nama..." 
+        className="admin-input max-w-xs mb-4" 
+        autoComplete="new-password"
+        readOnly
+        onFocus={(e) => e.target.removeAttribute('readonly')}
+      />
 
       {/* Users Table */}
       {loading ? (
@@ -1123,11 +1819,15 @@ function UsersTab({ session }: { session: any }) {
           {Array.from({length:5}).map((_,i) => <div key={i} className="skeleton h-14 rounded-xl" />)}
         </div>
       ) : (
-        <div className="overflow-x-auto block w-full min-w-0 rounded-xl border border-gold/15" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="admin-table w-full min-w-[700px]">
+        <div className="overflow-x-auto block w-full min-w-0 rounded-xl border border-gold/15 pr-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className="admin-table w-full min-w-[900px]">
             <thead>
-              <tr>
-                <th>Email</th><th>Nama</th><th>Status</th><th>Login Terakhir</th><th>Aksi</th>
+              <tr className="text-left">
+                <th>Nama</th>
+                <th>Email</th>
+                <th>Aksi</th>
+                <th>Status</th>
+                <th>Login Terakhir</th>
               </tr>
             </thead>
             <tbody>
@@ -1135,29 +1835,43 @@ function UsersTab({ session }: { session: any }) {
                 <tr><td colSpan={5} className="text-center text-cream/30 py-8">Tidak ada akun ditemukan</td></tr>
               )}
               {filtered.map(u => (
-                <tr key={u.id}>
-                  <td className="text-sm font-body text-cream/80 max-w-[180px] truncate">{u.email}</td>
-                  <td className="text-xs text-cream/60">{u.full_name || '—'}</td>
+                <tr key={u.id} className="hover:bg-gold/5 transition-colors group">
+                  <td className="font-display font-bold text-sm text-cream/90">{u.full_name || '—'}</td>
+                  <td className="text-xs font-body text-cream/50">{u.email}</td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setEditingUser(u)}
+                        className="p-2 rounded-lg bg-gold/10 text-gold hover:bg-gold hover:text-charcoal transition-all duration-300"
+                        title="Edit User"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(u)}
+                        className="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all duration-300"
+                        title="Hapus User"
+                        disabled={u.is_owner || u.is_hardcoded_root}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
                   <td>
                     <div className="flex gap-1 flex-wrap">
-                      {u.is_admin && <span className="admin-badge admin-badge-approved">👑 Admin</span>}
-                      {!u.is_admin && <span className="admin-badge" style={{background:'rgba(201,162,39,0.08)',color:'rgba(245,240,232,0.4)',border:'1px solid rgba(201,162,39,0.15)'}}>Santri</span>}
-                      {!u.confirmed && <span className="admin-badge admin-badge-pending">Unverified</span>}
+                      {u.role === 'root' && <span className="admin-badge admin-badge-approved">👑 Root</span>}
+                      {u.role === 'manager_ikhwa' && <span className="admin-badge admin-badge-approved">🧔 Manager Ikhwa</span>}
+                      {u.role === 'manager_akhwat' && <span className="admin-badge admin-badge-approved">👩 Manager Akhwat</span>}
+                      {!u.role && <span className="admin-badge" style={{background:'rgba(201,162,39,0.08)',color:'rgba(245,240,232,0.4)',border:'1px solid rgba(201,162,39,0.15)'}}>Santri</span>}
+                      {u.is_owner && <span className="admin-badge admin-badge-approved">Root Utama</span>}
                     </div>
                   </td>
-                  <td className="text-cream/30 text-xs">
-                    {u.last_sign_in ? new Date(u.last_sign_in).toLocaleDateString('id-ID') : 'Belum pernah'}
-                  </td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleAdmin(u)}
-                        className={`admin-btn text-[10px] py-1 px-2 ${u.is_admin ? 'admin-btn-danger' : 'admin-btn-success'}`}
-                      >
-                        {u.is_admin ? '👑 Cabut Admin' : '⭐ Jadikan Admin'}
-                      </button>
-                      <button onClick={() => handleDelete(u)} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">🗑</button>
-                    </div>
+                  <td className="text-cream/30 text-[10px] font-mono uppercase">
+                    {u.last_sign_in ? new Date(u.last_sign_in).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) : 'Belum pernah'}
                   </td>
                 </tr>
               ))}
@@ -1165,6 +1879,227 @@ function UsersTab({ session }: { session: any }) {
           </table>
         </div>
       )}
+
+      {/* Edit Modal */}
+      {editingUser && (
+        <EditUserModal 
+          user={editingUser} 
+          onClose={() => setEditingUser(null)} 
+          onSave={() => { setEditingUser(null); fetchUsers(true); }} 
+        />
+      )}
+    </div>
+  );
+}
+
+// ── EDIT USER MODAL ───────────────────
+function EditUserModal({ user, onClose, onSave }: { user: UserRow; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({
+    full_name: user.full_name || '',
+    role: user.role || '',
+    password: ''
+  });
+  const [saving, setSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token || '';
+      
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ 
+          email: user.email, 
+          full_name: form.full_name, 
+          role: form.role === '' ? null : form.role,
+          password: form.password || undefined
+        }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan perubahan');
+      
+      toast.success('Akun berhasil diperbarui!');
+      handleClose(true); // Exit animation then refresh
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div 
+        className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} 
+        onClick={handleClose}
+      />
+      
+      {/* Modal Card */}
+      <div className={`relative w-full max-w-md bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        {/* Decorative elements */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+        
+        {/* Header - More Compact */}
+        <div className="relative flex items-center justify-between px-5 py-4 border-b border-white/5 opacity-0 animate-fade-in-fast animate-stagger-1">
+          <div className="">
+            <h3 className="font-display text-cream text-base font-bold leading-tight">Pengaturan Akun</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="w-5 h-[1px] bg-gold/30" />
+              <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading">Edit Profile</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleClose} 
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white hover:bg-red-500/20 transition-all duration-300"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body - More Compact */}
+        <div className="relative flex-1 overflow-y-auto p-5 pt-4 custom-scrollbar">
+          <div className="space-y-5">
+            {/* User Info Card */}
+            <div className="p-3 bg-white/[0.02] rounded-xl border border-white/5 opacity-0 animate-fade-in-fast animate-stagger-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-gold/10 flex items-center justify-center text-gold border border-gold/20">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[8px] text-cream/40 uppercase tracking-widest font-heading mb-0.5">Account Email</p>
+                  <p className="text-cream font-body text-xs font-semibold truncate">{user.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Full Name Input */}
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-3">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] pl-1 font-bold">Nama Lengkap</label>
+              <div className="relative group">
+                <input 
+                  value={form.full_name} 
+                  onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} 
+                  className="admin-input pl-9 focus:ring-1 focus:ring-gold/30 transition-all bg-white/[0.03] text-xs py-2"
+                  placeholder="Nama santri..."
+                  autoComplete="new-password" 
+                  id="edit_full_name"
+                  name="edit_full_name"
+                />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/20 group-focus-within:text-gold transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-4">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] pl-1 font-bold">Wewenang Akun</label>
+              <div className="space-y-1.5">
+                {[
+                  { id: '', label: 'Santri', desc: 'Akses lihat konten', icon: '📖' },
+                  { id: 'manager_ikhwa', label: 'Manager Ikhwa', desc: 'Data Neutrino', icon: '🧔' },
+                  { id: 'manager_akhwat', label: 'Manager Akhwat', desc: 'Data All Axe', icon: '👩' },
+                  { id: 'root', label: 'Root Admin', desc: 'Akses penuh', icon: '👑' },
+                ].map((roleOption) => {
+                  const isSelected = form.role === roleOption.id;
+                  const isLocked = (user.is_owner || user.is_hardcoded_root);
+                  
+                  if (isLocked && !isSelected) return null;
+
+                  return (
+                    <button
+                      key={roleOption.id}
+                      onClick={() => !isLocked && setForm(f => ({ ...f, role: roleOption.id as any }))}
+                      className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition-all duration-300 text-left relative ${
+                        isSelected 
+                          ? 'bg-gold/10 border-gold/40' 
+                          : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'
+                      } ${isLocked ? 'cursor-default' : 'cursor-pointer active:scale-[0.98]'}`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 ${isSelected ? 'bg-gold/20' : 'bg-white/5'}`}>
+                        {roleOption.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[11px] font-bold font-heading tracking-wide ${isSelected ? 'text-gold' : 'text-cream/80'}`}>{roleOption.label}</p>
+                        <p className="text-[8px] text-cream/40 font-body truncate">{roleOption.desc}</p>
+                      </div>
+                      {!isLocked && (
+                        <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'bg-gold border-gold' : 'border-white/10'}`}>
+                          {isSelected && (
+                            <svg className="w-2 h-2 text-charcoal-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Password Input */}
+            <div className="pb-1 opacity-0 animate-fade-in-fast animate-stagger-5">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] pl-1 font-bold">Keamanan</label>
+              <div className="relative group">
+                <input 
+                  type="password"
+                  value={form.password} 
+                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))} 
+                  className="admin-input pl-9 focus:ring-1 focus:ring-gold/30 transition-all bg-white/[0.03] text-xs py-2"
+                  placeholder="Password Baru (Opsional)"
+                  autoComplete="new-password"
+                  id="edit_password"
+                  name="edit_password"
+                />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/20 group-focus-within:text-gold transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m11-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer - More Compact */}
+        <div className="relative p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md opacity-0 animate-fade-in-fast animate-stagger-5">
+          <div className="flex gap-2">
+            <button 
+              onClick={handleClose} 
+              className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all btn-press-active"
+            >
+              BATAL
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saving} 
+              className={`flex-[1.5] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 active:scale-95 transition-all disabled:opacity-50 btn-press-active ${saving ? 'btn-loading-shimmer opacity-80' : ''}`}
+            >
+              {saving ? 'SAVING...' : 'SIMPAN'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1173,15 +2108,7 @@ function UsersTab({ session }: { session: any }) {
 function TimelineTab() {
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [editItem, setEditItem] = useState<TimelineItem | null>(null);
-  const { session } = useAuth();
-
-  // Form State
-  const [form, setForm] = useState<Omit<TimelineItem, 'id' | 'created_at'>>({
-    date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅'
-  });
-  const [saving, setSaving] = useState(false);
+  const [editingItem, setEditItem] = useState<TimelineItem | 'new' | null>(null);
 
   useEffect(() => { fetchTimeline(); }, []);
 
@@ -1192,46 +2119,11 @@ function TimelineTab() {
     setLoading(false);
   };
 
-  const handleSave = async () => {
-    if (!form.judul || !form.date || !form.deskripsi) {
-      toast.error('Judul, Tanggal, dan Deskripsi wajib diisi!');
-      return;
-    }
-    setSaving(true);
-    try {
-      const token = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
-      
-      if (editItem) {
-        const res = await fetch('/api/admin/timeline', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ id: editItem.id, ...form }),
-        });
-        if (!res.ok) throw new Error((await res.json()).error);
-        toast.success('Timeline diperbarui!');
-      } else {
-        const res = await fetch('/api/admin/timeline', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(form),
-        });
-        if (!res.ok) throw new Error((await res.json()).error);
-        toast.success('Timeline ditambahkan!');
-      }
-      fetchTimeline();
-      setShowAdd(false);
-      setEditItem(null);
-      setForm({ date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅' });
-    } catch (err: any) {
-      toast.error('Gagal: ' + (err?.message || 'Terjadi kesalahan'));
-    }
-    setSaving(false);
-  };
-
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus event timeline ini?')) return;
     try {
-      const token = session?.access_token || (await supabase.auth.getSession()).data.session?.access_token;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
       const res = await fetch('/api/admin/timeline', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -1243,19 +2135,6 @@ function TimelineTab() {
     } catch (err: any) {
       toast.error('Gagal menghapus: ' + (err?.message || ''));
     }
-  };
-
-  const openEdit = (item: TimelineItem) => {
-    setForm({
-      date: item.date,
-      judul: item.judul,
-      deskripsi: item.deskripsi,
-      kelas: item.kelas,
-      type: item.type,
-      emoji: item.emoji
-    });
-    setEditItem(item);
-    setShowAdd(true);
   };
 
   const typeColors: Record<string, string> = {
@@ -1273,64 +2152,10 @@ function TimelineTab() {
           <h2 className="font-display text-cream text-xl font-bold">Timeline Perjalanan</h2>
           <p className="text-cream/40 text-xs font-body">{items.length} event terdaftar</p>
         </div>
-        <button onClick={() => { setEditItem(null); setForm({ date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅' }); setShowAdd(!showAdd); }} className="admin-btn admin-btn-primary text-xs flex-shrink-0">
-          {showAdd ? 'Batal' : '+ Tambah Event'}
+        <button onClick={() => setEditItem('new')} className="admin-btn admin-btn-primary text-xs flex-shrink-0 btn-press-active">
+          + Tambah Event
         </button>
       </div>
-
-      {showAdd && (
-        <div className="card-dark p-6 mb-8 max-w-2xl border-l-2 border-gold">
-          <h3 className="text-cream text-sm font-display font-bold mb-4">{editItem ? 'Edit Event' : 'Tambah Event Baru'}</h3>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="section-label text-[10px] block mb-1">Judul Event</label>
-                <input value={form.judul} onChange={e => setForm(f => ({ ...f, judul: e.target.value }))} className="admin-input" placeholder="Misal: Penerimaan Santri Baru" />
-              </div>
-              <div>
-                <label className="section-label text-[10px] block mb-1">Tanggal / Waktu</label>
-                <input value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="admin-input" placeholder="Misal: Juli 2023" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="section-label text-[10px] block mb-1">Emoji / Ikon</label>
-                <input value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e.target.value }))} className="admin-input text-center text-xl" />
-              </div>
-              <div>
-                <label className="section-label text-[10px] block mb-1">Tipe Event</label>
-                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))} className="admin-select capitalize">
-                  <option value="event">Event Umum</option>
-                  <option value="hafalan">Hafalan Quran</option>
-                  <option value="lomba">Perlombaan</option>
-                  <option value="asrama">Kegiatan Asrama</option>
-                  <option value="wisuda">Wisuda</option>
-                </select>
-              </div>
-              <div>
-                <label className="section-label text-[10px] block mb-1">Target Kelas</label>
-                <select value={form.kelas} onChange={e => setForm(f => ({ ...f, kelas: e.target.value as any }))} className="admin-select">
-                  <option value="both">Semua Kelas</option>
-                  <option value="neutrino">Neutrino Saja</option>
-                  <option value="all-axe">All Axe Saja</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="section-label text-[10px] block mb-1">Deskripsi & Kenangan</label>
-              <textarea value={form.deskripsi} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} rows={4} className="admin-input resize-none" placeholder="Ceritakan detail event ini..." />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleSave} disabled={saving} className="admin-btn admin-btn-primary py-2.5 px-6">
-                {saving ? '⏳ Menyimpan...' : '💾 Simpan Event'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="space-y-4">
@@ -1339,37 +2164,174 @@ function TimelineTab() {
       ) : (
         <div className="space-y-3 max-w-4xl">
           {items.map((item) => (
-            <div key={item.id} className="card-dark p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 group">
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-12 h-12 rounded-xl bg-charcoal flex items-center justify-center text-2xl flex-shrink-0 border border-gold/10">
+            <div key={item.id} className="card-dark p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 group hover:border-gold/30 transition-all">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-charcoal flex items-center justify-center text-2xl flex-shrink-0 border border-gold/10 group-hover:scale-110 transition-transform">
                   {item.emoji}
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-gold font-mono text-xs">{item.date}</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold tracking-wider uppercase ${typeColors[item.type] || typeColors.event}`}>{item.type}</span>
+                    <span className="text-gold font-mono text-[10px] uppercase tracking-wider">{item.date}</span>
+                    <span className={`text-[8px] px-2 py-0.5 rounded-full border font-bold tracking-widest uppercase ${typeColors[item.type] || typeColors.event}`}>{item.type}</span>
                     {item.kelas !== 'both' && (
-                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/50 uppercase">{item.kelas}</span>
+                      <span className="text-[8px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/50 uppercase tracking-widest">{item.kelas}</span>
                     )}
                   </div>
-                  <h3 className="font-display text-cream font-bold leading-tight">{item.judul}</h3>
-                  <p className="text-cream/50 text-xs mt-1.5 line-clamp-2 md:line-clamp-none">{item.deskripsi}</p>
+                  <h3 className="font-display text-cream font-bold leading-tight truncate">{item.judul}</h3>
+                  <p className="text-cream/50 text-[11px] mt-1 line-clamp-1 group-hover:line-clamp-none transition-all duration-500">{item.deskripsi}</p>
                 </div>
               </div>
               
-              <div className="flex sm:flex-col gap-2 mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-auto border-t border-gold/10 sm:border-0 pt-3 sm:pt-0 w-full sm:w-auto justify-end">
-                <button onClick={() => openEdit(item)} className="admin-btn admin-btn-ghost text-xs py-1.5 px-3">Edit</button>
-                <button onClick={() => handleDelete(item.id)} className="admin-btn admin-btn-danger text-xs py-1.5 px-3">Hapus</button>
+              <div className="flex sm:flex-col gap-2 mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-auto border-t border-white/5 sm:border-0 pt-3 sm:pt-0 w-full sm:w-auto justify-end">
+                <button onClick={() => setEditItem(item)} className="admin-btn admin-btn-ghost text-[10px] py-1.5 px-3 btn-press-active">Edit</button>
+                <button onClick={() => handleDelete(item.id)} className="admin-btn admin-btn-danger text-[10px] py-1.5 px-3 btn-press-active">Hapus</button>
               </div>
             </div>
           ))}
           {items.length === 0 && (
-            <div className="text-center p-8 border border-dashed border-gold/20 rounded-xl">
-              <p className="text-cream/40 text-sm">Belum ada event timeline.</p>
+            <div className="text-center p-12 border border-dashed border-gold/10 rounded-2xl bg-white/[0.01]">
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-cream/10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-cream/30 text-sm font-heading tracking-widest uppercase">Belum ada jejak perjalanan</p>
             </div>
           )}
         </div>
       )}
+
+      {editingItem && (
+        <EditTimelineModal 
+          item={editingItem === 'new' ? null : editingItem} 
+          onClose={() => setEditItem(null)} 
+          onSave={() => { setEditItem(null); fetchTimeline(); }} 
+        />
+      )}
+    </div>
+  );
+}
+
+function EditTimelineModal({ item, onClose, onSave }: { item: TimelineItem | null; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState<Omit<TimelineItem, 'id' | 'created_at'>>(
+    item ? { ...item } : { date: '', judul: '', deskripsi: '', kelas: 'both', type: 'event', emoji: '📅' }
+  );
+  const [saving, setSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      if (shouldRefresh) onSave();
+      else onClose();
+    }, 300);
+  };
+
+  const handleSave = async () => {
+    if (!form.judul || !form.date || !form.deskripsi) {
+      toast.error('Lengkapi data wajib!');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      
+      const method = item ? 'PATCH' : 'POST';
+      const body = item ? { id: item.id, ...form } : form;
+      
+      const res = await fetch('/api/admin/timeline', {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      
+      if (!res.ok) throw new Error((await res.json()).error);
+      toast.success(item ? 'Update Berhasil!' : 'Event Ditambahkan!');
+      handleClose(true);
+    } catch (err: any) {
+      toast.error('Gagal: ' + (err?.message || 'Error'));
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} onClick={() => handleClose()} />
+      <div className={`relative w-full max-w-lg bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-gold/5 to-transparent">
+          <div>
+            <h3 className="font-display text-cream text-base font-bold">{item ? 'Edit Perjalanan' : 'Tambah Jejak Baru'}</h3>
+            <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading mt-0.5">Timeline Editor</p>
+          </div>
+          <button onClick={() => handleClose()} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-1">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Judul Event</label>
+              <input value={form.judul} onChange={e => setForm(f => ({ ...f, judul: e.target.value }))} className="admin-input text-xs py-2" placeholder="Judul..." />
+            </div>
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-2">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Waktu (Bulan/Tahun)</label>
+              <input value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="admin-input text-xs py-2 font-mono" placeholder="Mei 2024..." />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-3">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Emoji Ikon</label>
+              <input value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e.target.value }))} className="admin-input text-center text-xl bg-white/5 py-1.5" />
+            </div>
+            <div className="opacity-0 animate-fade-in-fast animate-stagger-4 md:col-span-2">
+              <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Kategori</label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))} className="admin-select text-xs py-2 capitalize">
+                <option value="event">Event Umum</option>
+                <option value="hafalan">Hafalan Quran</option>
+                <option value="lomba">Perlombaan</option>
+                <option value="asrama">Kegiatan Asrama</option>
+                <option value="wisuda">Wisuda</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="opacity-0 animate-fade-in-fast animate-stagger-5">
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Target Kelas</label>
+            <div className="grid grid-cols-3 gap-2">
+              {['both', 'neutrino', 'all-axe'].map(k => (
+                <button 
+                  key={k} 
+                  onClick={() => setForm(f => ({ ...f, kelas: k as any }))}
+                  className={`py-2 rounded-xl text-[9px] font-bold border transition-all uppercase tracking-wider ${form.kelas === k ? 'bg-gold/10 border-gold/40 text-gold' : 'bg-white/5 border-white/5 text-cream/30 hover:bg-white/10'}`}
+                >
+                  {k === 'both' ? 'Semua' : k}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="opacity-0 animate-fade-in-fast animate-stagger-6">
+            <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Deskripsi & Kenangan</label>
+            <textarea value={form.deskripsi} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} rows={4} className="admin-input resize-none text-xs py-2 custom-scrollbar" placeholder="Ceritakan detail..." />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md">
+          <div className="flex gap-2">
+            <button onClick={() => handleClose()} className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all btn-press-active">BATAL</button>
+            <button onClick={handleSave} disabled={saving} className={`flex-[2] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 active:scale-95 transition-all btn-press-active ${saving ? 'btn-loading-shimmer' : ''}`}>
+              {saving ? 'SAVING...' : (item ? 'SIMPAN PERUBAHAN' : 'PUBLISH EVENT')}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
