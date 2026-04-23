@@ -1943,7 +1943,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRow; onClose: () =
       {/* Backdrop */}
       <div 
         className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`} 
-        onClick={handleClose}
+        onClick={() => handleClose()}
       />
       
       {/* Modal Card */}
@@ -1962,7 +1962,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRow; onClose: () =
             </div>
           </div>
           <button 
-            onClick={handleClose} 
+            onClick={() => handleClose()} 
             className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white hover:bg-red-500/20 transition-all duration-300"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2085,7 +2085,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRow; onClose: () =
         <div className="relative p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md opacity-0 animate-fade-in-fast animate-stagger-5">
           <div className="flex gap-2">
             <button 
-              onClick={handleClose} 
+              onClick={() => handleClose()} 
               className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all btn-press-active"
             >
               BATAL
