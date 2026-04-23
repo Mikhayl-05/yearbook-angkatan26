@@ -1760,7 +1760,7 @@ function UsersTab({ session }: { session: any }) {
               <p className="text-cream/50 text-xs">{error}</p>
             </div>
           </div>
-          <button onClick={fetchUsers} className="admin-btn admin-btn-ghost text-xs mt-4">🔄 Coba Lagi</button>
+          <button onClick={() => fetchUsers()} className="admin-btn admin-btn-ghost text-xs mt-4">🔄 Coba Lagi</button>
         </div>
       )}
 
