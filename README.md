@@ -1,211 +1,103 @@
-# 📚 Yearbook Angkatan 26 — Pondok Pesantren Wahdah Islamiyah
+# 🎓 Yearbook Angkatan 26 — Pondok Pesantren Wahdah Islamiyah
 
-> Link sementara: https://yearbook-26.vercel.app/
-
+> Link Live: https://yearbook-26.vercel.app/
+> 
 > **Digital Yearbook** untuk Angkatan ke-26 (XVI) PPWI — Neutrino (Ikhwa) & All Axe (Akhwat) · 2023–2026
 
 ---
 
-## 🗂️ Struktur Folder
+## ✨ Fitur Utama (Premium Edition)
+
+*   **Premium Admin Dashboard**: Sistem manajemen data santri, guru, gallery, dan playlist dengan antarmuka modal berbasis glassmorphism yang mewah.
+*   **Smart Playlist Reordering**: Pengaturan urutan lagu di playlist menggunakan sistem panah cerdas dengan animasi *sliding* yang halus (Framer Motion).
+*   **Role-Based Access Control**: Manajemen akun bertingkat (Root Admin, Manager Ikhwa, Manager Akhwat) untuk keamanan data yang lebih baik.
+*   **Full Responsive PWA**: Pengalaman "app-like" di perangkat mobile maupun desktop, dapat diinstal langsung ke home screen.
+*   **Dynamic Timeline**: Jejak perjalanan angkatan yang dapat dikelola langsung dari panel admin.
+*   **Interactive Sticky Notes**: Dinding kutipan (Quote Wall) interaktif bagi para santri.
+
+---
+
+## 🗂️ Struktur Folder Terbaru
 
 ```
 yearbook-angkatan26/
-├── public/
-│   ├── manifest.json         ← PWA manifest
-│   ├── icons/                ← App icons (72–512px)
-│   ├── audio/                ← File audio (soundboard & playlist)
-│   └── images/               ← Foto grup kelas
 ├── src/
 │   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Navbar.tsx    ← Navigasi + music toggle
-│   │   │   └── MusicPlayer.tsx ← Player mengambang
-│   │   ├── sections/
-│   │   │   ├── KelasHeader.tsx ← Header halaman kelas
-│   │   │   └── StudentCard.tsx ← Kartu santri (flip)
-│   │   └── ui/
-│   │       ├── GoldParticles.tsx ← Partikel dekoratif
-│   │       └── CountdownTimer.tsx ← Hitung mundur wisuda
+│   │   ├── layout/       ← Navbar & MusicPlayer premium
+│   │   ├── sections/     ← Komponen utama (Mosaic, Flip Cards)
+│   │   └── ui/           ← Elemen dekoratif & animasi
 │   ├── context/
-│   │   ├── AuthContext.tsx   ← Auth state (Supabase)
-│   │   └── MusicContext.tsx  ← State musik global
-│   ├── data/
-│   │   └── students.ts       ← Data seluruh santri (39 orang)
+│   │   ├── AuthContext.tsx   ← Auth state & Role Management
+│   │   └── MusicContext.tsx  ← Sinkronisasi playlist & playback
 │   ├── lib/
-│   │   └── supabase.ts       ← Client & helper Supabase
+│   │   ├── supabase.ts       ← Client Supabase
+│   │   └── adminRoles.ts     ← Logika otorisasi admin
 │   ├── pages/
-│   │   ├── index.tsx         ← Landing (split-screen)
-│   │   ├── login.tsx         ← Halaman login
-│   │   ├── gallery.tsx       ← Gallery foto
-│   │   ├── timeline.tsx      ← Timeline perjalanan
-│   │   ├── quotes.tsx        ← Sticky Notes Wall
-│   │   ├── soundboard.tsx    ← Soundboard interaktif
-│   │   ├── kelas/[id].tsx    ← Halaman kelas (Neutrino/All Axe)
-│   │   └── admin/index.tsx   ← Admin dashboard
+│   │   ├── api/admin/        ← API Routes untuk manajemen konten aman
+│   │   ├── admin/index.tsx   ← Dashboard Admin Premium
+│   │   ├── index.tsx         ← Split-screen landing
+│   │   └── [...]             ← Halaman fitur lainnya
 │   └── styles/
-│       └── globals.css       ← Global CSS + design tokens
-├── supabase-schema.sql       ← SQL untuk setup database
-├── .env.example              ← Template environment variables
-├── .github/workflows/deploy.yml ← CI/CD GitHub Actions
-└── next.config.js            ← Next.js + PWA config
+│       └── globals.css       ← Design tokens & Premium Keyframes
+├── supabase-migration.sql     ← Schema database utama
+└── supabase-role-migration.sql ← Schema untuk sistem role admin
 ```
 
 ---
 
-## 🚀 Panduan Setup (Step-by-Step)
+## 🚀 Panduan Setup Cepat
 
-### STEP 1 — Clone & Install
-
+### 1. Persiapan Lingkungan
 ```bash
-git clone https://github.com/USERNAME/yearbook-angkatan26.git
+git clone https://github.com/Mikhayl-05/yearbook-angkatan26.git
 cd yearbook-angkatan26
 npm install
 ```
 
-### STEP 2 — Setup Supabase (GRATIS)
+### 2. Konfigurasi Database (Supabase)
+1. Jalankan `supabase-migration.sql` di SQL Editor Supabase.
+2. Jalankan `supabase-role-migration.sql` untuk mengaktifkan sistem role admin.
+3. Salin variabel environment ke `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   ```
 
-1. Daftar di [supabase.com](https://supabase.com) → **New Project**
-2. Pilih region: **Southeast Asia (Singapore)**
-3. Buka **SQL Editor** → paste isi file `supabase-schema.sql` → **Run**
-4. Buka **Settings → API** → copy:
-   - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-   - `anon public key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### STEP 3 — Buat Admin User
-
-Di Supabase Dashboard → **Authentication → Users → Invite User**:
-- Email: `admin@yearbookangkatan26.com`
-- User ini punya akses Admin Panel
-
-### STEP 4 — Setup Environment Variables
-
-```bash
-cp .env.example .env.local
-# Edit .env.local dengan nilai dari Supabase
-```
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-```
-
-### STEP 5 — Jalankan Lokal
-
+### 3. Menjalankan Dashboard
 ```bash
 npm run dev
-# Buka http://localhost:3000
 ```
 
 ---
 
-## 📦 Deploy ke GitHub Pages + Cloudflare
+## 🛠️ Teknologi & Animasi
 
-### A. Push ke GitHub
-
-```bash
-git init
-git remote add origin https://github.com/USERNAME/yearbook-angkatan26.git
-git add .
-git commit -m "🎓 Yearbook Angkatan 26 — Initial Release"
-git push -u origin main
-```
-
-### B. Setup GitHub Secrets
-
-Di GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**:
-
-| Name | Value |
-|------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL Supabase kamu |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key Supabase |
-
-### C. Aktifkan GitHub Pages
-
-**Settings → Pages → Source: GitHub Actions** → Save
-
-Setelah push ke `main`, GitHub Actions akan otomatis build & deploy!
-URL default: `https://USERNAME.github.io/yearbook-angkatan26/`
-
-### D. Custom Domain via Cloudflare (Opsional tapi keren!)
-
-1. Beli domain murah (misal: `angkatan26.my.id` ~Rp30rb/tahun di Niagahoster)
-2. Di Cloudflare → **Add Site** → arahkan nameserver domain ke Cloudflare
-3. Di Cloudflare DNS → tambah record:
-   ```
-   Type: CNAME
-   Name: @ (atau www)
-   Target: USERNAME.github.io
-   Proxy: ON (🟠)
-   ```
-4. Di GitHub repo → **Settings → Pages → Custom domain** → isi domain
+| Teknologi | Implementasi |
+|-----------|--------------|
+| **Next.js 14** | Core Framework & Serverless Functions |
+| **Tailwind CSS** | Premium Glassmorphism & Responsive Design |
+| **Framer Motion** | Advanced Modal Transitions & Layout Reordering |
+| **Supabase** | Real-time DB, Auth, & Object Storage |
+| **PWA** | Offline access & App Installation |
 
 ---
 
-## 🎨 Cara Upload Foto Santri
+## 💎 Panduan Admin (Premium Features)
 
-1. Login ke website sebagai Admin
-2. Buka `/admin` → tab **Gallery** → upload foto
-3. Atau upload langsung di **Supabase Storage → yearbook bucket**
-4. Untuk foto profil santri: nama file `n-01.jpg`, `a-01.jpg` dll.
-5. Update field `foto` di tabel `santri` dengan URL publik
+### Manajemen Playlist
+Akses **Admin Dashboard > Playlist**. Gunakan tombol panah untuk mengatur urutan lagu. Perubahan urutan akan memicu animasi geser yang halus dan tersimpan otomatis ke database, yang kemudian akan merefleksikan urutan yang sama di Music Player utama.
 
----
-
-## 🔊 Cara Tambah Audio
-
-1. Letakkan file `.mp3` di folder `public/audio/`
-2. Nama file sesuai yang didefinisikan di `soundboard.tsx` dan `MusicContext.tsx`
-3. Atau upload ke Supabase Storage → update URL di Admin Playlist
+### Manajemen Role Akun
+Sebagai **Root Admin**, Anda dapat memberikan akses khusus:
+- **Manager Ikhwa**: Mengelola data khusus santri Neutrino.
+- **Manager Akhwat**: Mengelola data khusus santri All Axe.
+- **Root Admin**: Akses penuh ke seluruh sistem.
 
 ---
 
-## 📱 Install sebagai PWA
+## 💌 Kontribusi & Support
 
-Di Chrome mobile (Android):
-1. Buka website di browser
-2. Tap menu (⋮) → **"Add to Home Screen"**
-3. Konfirmasi → Ikon YB-A26 akan muncul di layar utama!
-
-Di iOS Safari:
-1. Tap tombol Share (□↑)
-2. Pilih **"Add to Home Screen"**
-
----
-
-## 🛠️ Teknologi yang Digunakan
-
-| Tech | Kegunaan | Biaya |
-|------|----------|-------|
-| Next.js 14 | Framework React + Static Export | Gratis |
-| Tailwind CSS | Styling | Gratis |
-| Supabase | Database + Auth + Storage | Gratis (500MB) |
-| GitHub Pages | Hosting | Gratis |
-| Cloudflare | CDN + Custom Domain | Gratis |
-| next-pwa | Progressive Web App | Gratis |
-
-**Total biaya: Rp0 (kecuali domain opsional)**
-
----
-
-## 📝 Catatan Pengembangan
-
-### Menambah Fitur Photo Mosaic (Lanjutan)
-Fitur mosaic dinamis (foto kecil membentuk logo) membutuhkan canvas manipulation.
-Implementasi ada di `src/components/sections/PhotoMosaic.tsx` — aktifkan setelah foto santri tersedia.
-
-### Watermark Otomatis
-Watermark CSS sudah aktif via class `.watermarked` dan `.watermark-overlay`.
-Untuk watermark yang lebih kuat, gunakan server-side image processing dengan Sharp.
-
----
-
-## 💌 Kontribusi
-
-Untuk menambah fitur atau melaporkan bug:
-- Buat issue di GitHub
-- Atau hubungi admin yearbook via WhatsApp group Angkatan 26
-
----
+Angkatan 26 · Neutrino & All Axe · Pondok Pesantren Wahdah Islamiyah
 
 **SOMO LULUS! 🎓✨**
-*Angkatan 26 · Neutrino & All Axe · Wahdah Islamiyah · 2023–2026*
+*Build with pride by the Yearbook Team.*
