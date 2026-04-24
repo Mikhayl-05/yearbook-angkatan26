@@ -1,5 +1,5 @@
-// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
+import { processImage } from './imageUtils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -138,6 +138,22 @@ export const rejectSubmission = async (id: string) => {
 // ─── UPLOAD HELPER ───────────────────────────────────────────
 export const uploadPhoto = async (file: File, path: string) => {
   const { data, error } = await supabase.storage.from('yearbook').upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data: url } = supabase.storage.from('yearbook').getPublicUrl(data.path);
+  return url.publicUrl;
+};
+
+export const uploadImage = async (file: File, path: string) => {
+  // Change extension to .webp in path if it's an image
+  const pathWithoutExt = path.substring(0, path.lastIndexOf('.'));
+  const webpPath = `${pathWithoutExt}.webp`;
+
+  const processedBlob = await processImage(file);
+  const { data, error } = await supabase.storage.from('yearbook').upload(webpPath, processedBlob, { 
+    upsert: true,
+    contentType: 'image/webp'
+  });
+  
   if (error) throw error;
   const { data: url } = supabase.storage.from('yearbook').getPublicUrl(data.path);
   return url.publicUrl;

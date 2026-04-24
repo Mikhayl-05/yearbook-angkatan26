@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import { supabase } from '@/lib/supabase';
 import type { GalleryItem } from '@/lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function GalleryDetailPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function GalleryDetailPage() {
   const [item, setItem] = useState<GalleryItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -22,6 +24,15 @@ export default function GalleryDetailPage() {
       setLoading(false);
     })();
   }, [id]);
+
+  // Handle ESC key to close zoom
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsZoomed(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   if (loading) return (
     <div className="min-h-screen dark-paper">
@@ -71,36 +82,40 @@ export default function GalleryDetailPage() {
       <div className="pt-24 md:pt-28 pb-16 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
-            {/* IMAGE */}
-            <div className="lg:w-[60%] flex-shrink-0">
-              <div className="relative rounded-xl overflow-hidden border border-gold/20">
-                {!imgLoaded && <div className="skeleton w-full" style={{ height: '500px' }} />}
-                <img
+            {/* IMAGE CONTAINER */}
+            <div className="lg:w-[60%] flex-shrink-0 flex justify-center items-start">
+              <motion.div 
+                layoutId="gallery-img-container"
+                onClick={() => setIsZoomed(true)}
+                className="relative rounded-xl overflow-hidden border border-gold/20 cursor-zoom-in w-full max-w-2xl h-fit shadow-2xl shadow-gold/5 group"
+              >
+                {!imgLoaded && <div className="skeleton w-full h-[400px]" />}
+                <motion.img
+                  layoutId="gallery-img"
                   src={item.url}
                   alt={item.caption || 'Gallery'}
-                  className={`w-full object-contain max-h-[80vh] transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  className={`w-full h-auto max-h-[80vh] object-contain transition-opacity duration-500 block ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
                   draggable={false}
                   onLoad={() => setImgLoaded(true)}
-                  onContextMenu={e => e.preventDefault()}
                 />
-              </div>
+                <div className="absolute inset-0 bg-gold/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] text-white font-heading tracking-widest border border-white/20">KLIK UNTUK ZOOM</span>
+                </div>
+              </motion.div>
             </div>
 
             {/* ARTICLE TEXT */}
             <div className="lg:w-[40%] flex flex-col">
-              {/* Category badge */}
               <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-gold/20 w-fit">
                 <span className="font-heading text-[10px] tracking-widest uppercase text-gold">
                   {CATEGORY_LABELS[item.category] || item.category}
                 </span>
               </div>
 
-              {/* Caption as title */}
               <h1 className="font-display font-black text-cream text-2xl md:text-3xl leading-tight mb-4">
                 {item.caption || 'Momen Kenangan'}
               </h1>
 
-              {/* Meta info */}
               <div className="flex flex-wrap gap-4 mb-6 text-cream/40 text-xs font-body">
                 <span>📅 {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                 {item.submitted_name && <span>👤 {item.submitted_name}</span>}
@@ -108,7 +123,6 @@ export default function GalleryDetailPage() {
 
               <div className="h-px bg-gradient-to-r from-gold/30 to-transparent mb-6" />
 
-              {/* Article text */}
               {item.article_text ? (
                 <div className="text-cream/70 text-sm font-body leading-relaxed whitespace-pre-wrap">
                   {item.article_text}
@@ -119,7 +133,6 @@ export default function GalleryDetailPage() {
                 </div>
               )}
 
-              {/* Back to gallery */}
               <div className="mt-auto pt-8">
                 <Link href="/gallery" className="btn-outline-gold text-xs py-2 px-6 inline-block">
                   ← Kembali ke Gallery
@@ -129,6 +142,47 @@ export default function GalleryDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ZOOM OVERLAY */}
+      <AnimatePresence>
+        {isZoomed && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1001] flex items-center justify-center p-6 sm:p-20 bg-black/95 backdrop-blur-2xl cursor-zoom-out"
+            onClick={() => setIsZoomed(false)}
+          >
+            {/* Zoomed Image Container */}
+            <div className="relative w-full h-full flex flex-col items-center justify-center">
+              <motion.div 
+                layoutId="gallery-img-container"
+                className="relative rounded-lg overflow-hidden border border-white/10 shadow-2xl bg-black"
+              >
+                <motion.img
+                  layoutId="gallery-img"
+                  src={item.url}
+                  alt={item.caption}
+                  className="w-auto h-auto max-w-[85vw] max-h-[75vh] md:max-h-[80vh] object-contain block"
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+              </motion.div>
+              
+              {/* Zoomed Caption */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6 text-center"
+              >
+                <p className="text-white font-display font-bold text-base md:text-xl tracking-wide">{item.caption}</p>
+                <p className="text-gold/60 text-[10px] uppercase tracking-[0.3em] font-heading mt-2">KLIK DI MANA SAJA UNTUK MENUTUP</p>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

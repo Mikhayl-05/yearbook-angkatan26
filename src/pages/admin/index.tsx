@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
-import { supabase, uploadPhoto, deleteFileFromStorage } from '@/lib/supabase';
+import { supabase, uploadPhoto, uploadImage, deleteFileFromStorage } from '@/lib/supabase';
 import type { SantriDB, GalleryItem, GallerySubmission, GuruDB, CustomLink, TimelineItem } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
@@ -269,6 +269,7 @@ function SantriTab({ scopeKelas }: { scopeKelas: string | null }) {
                       if(!confirm(`Hapus ${s.nama}?`)) return;
                       try {
                         await callAdminContent('DELETE', { resource: 'santri', id: s.id });
+                        if (s.foto) await deleteFileFromStorage(s.foto);
                         fetchSantri();
                         toast.success('Dihapus');
                       } catch (err: any) {
@@ -396,17 +397,21 @@ function EditSantriModal({ scopeKelas, santri, onClose, onSave }: { scopeKelas: 
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
     try {
-      const url = await uploadPhoto(file, `santri/${santri.id}_${Date.now()}.${file.name.split('.').pop()}`);
+      const oldPhoto = form.foto;
+      const url = await uploadImage(file, `santri/${santri.id}_${Date.now()}.webp`);
       setForm(f => ({ ...f, foto: url }));
-      toast.success('Foto diupload!');
+      if (oldPhoto) await deleteFileFromStorage(oldPhoto);
+      toast.success('Foto diupload (WebP optimized)!');
     } catch (err: any) { toast.error('Gagal upload: ' + (err?.message || 'Unknown error')); }
     setUploading(false);
   };
 
   const handleDeletePhoto = async () => {
     if (!confirm('Hapus foto santri? Foto akan direset ke default.')) return;
+    const oldPhoto = form.foto;
     setForm(f => ({ ...f, foto: '' }));
-    toast.success('Foto dihapus, simpan untuk konfirmasi.');
+    if (oldPhoto) await deleteFileFromStorage(oldPhoto);
+    toast.success('Foto dihapus dari storage.');
   };
 
   return (
@@ -708,9 +713,11 @@ function EditGuruModal({ guru, onClose, onSave }: { guru: GuruDB; onClose: () =>
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
     try {
-      const url = await uploadPhoto(file, `guru/${guru.id}_${Date.now()}.${file.name.split('.').pop()}`);
+      const oldPhoto = form.foto;
+      const url = await uploadImage(file, `guru/${guru.id}_${Date.now()}.webp`);
       setForm(f => ({ ...f, foto: url }));
-      toast.success('Foto diupload!');
+      if (oldPhoto) await deleteFileFromStorage(oldPhoto);
+      toast.success('Foto diupload (WebP optimized)!');
     } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
     setUploading(false);
   };
@@ -925,12 +932,12 @@ function AddPhotoModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | n
     if (!uploadFile) { toast.error('Pilih foto!'); return; }
     setUploading(true);
     try {
-      const url = await uploadPhoto(uploadFile, `gallery/${Date.now()}.${uploadFile.name.split('.').pop()}`);
+      const url = await uploadImage(uploadFile, `gallery/${Date.now()}.webp`);
       await callAdminContent('POST', {
         resource: 'gallery',
         data: { url, caption, article_text: article || null, category, kelas: scopeKelas ?? kelas, submitted_name: 'Admin', submitted_by: user?.id },
       });
-      toast.success('Foto diupload!');
+      toast.success('Foto diupload (WebP optimized)!');
       handleClose(true);
     } catch (err: any) {
       toast.error('Gagal upload: ' + (err?.message || 'Cek koneksi dan storage bucket'));
@@ -1084,6 +1091,8 @@ function SubmissionsTab({ onUpdate, scopeKelas }: { onUpdate: () => void; scopeK
   const handleReject = async (id: string) => {
     try {
       await callAdminContent('PATCH', { resource: 'submission', id, status: 'rejected' });
+      const sub = subs.find(s => s.id === id);
+      if (sub?.url) await deleteFileFromStorage(sub.url);
       toast.success('Ditolak'); fetchSubs(); onUpdate();
     } catch (err: any) {
       toast.error(err?.message || 'Gagal menolak');
@@ -1514,13 +1523,15 @@ function SettingsTab() {
     const file = e.target.files?.[0]; if(!file) return;
     setSaving(key);
     try {
-      const url = await uploadPhoto(file, `settings/${key}_${Date.now()}.${file.name.split('.').pop()}`);
+      const oldUrl = key === 'neutrino_bg_url' ? neutrinoBg : key === 'allaxe_bg_url' ? allAxeBg : ogBg;
+      const url = await uploadImage(file, `settings/${key}_${Date.now()}.webp`);
       const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()}, { onConflict: 'key' });
       if (error) throw error;
+      if (oldUrl) await deleteFileFromStorage(oldUrl);
       if(key==='neutrino_bg_url') setNeutrinoBg(url);
       if(key==='allaxe_bg_url') setAllAxeBg(url);
       if(key==='og_image_url') setOgBg(url);
-      toast.success('Pengaturan diupdate!');
+      toast.success('Pengaturan diupdate (WebP optimized)!');
     } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
     setSaving(null);
   };
