@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import { LINK_GRADIENT_PRESETS } from '@/components/sections/StudentCard';
 
-type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users';
+type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users' | 'eggphotos';
 
 const getAccessToken = async (): Promise<string> => {
   const { data } = await supabase.auth.getSession();
@@ -92,6 +92,7 @@ export default function AdminDashboard() {
     { id: 'playlist',    label: 'Playlist',     icon: '🎵' },
     ...(isRoot ? [{ id: 'timeline' as const, label: 'Timeline', icon: '📅' }] : []),
     ...(isRoot ? [{ id: 'settings' as const, label: 'Pengaturan', icon: '⚙️' }] : []),
+    ...(isRoot ? [{ id: 'eggphotos' as const, label: 'Easter Egg', icon: '🥚' }] : []),
     ...(isRoot ? [{ id: 'users' as const, label: 'Akun', icon: '🔐' }] : []),
   ];
 
@@ -141,6 +142,7 @@ export default function AdminDashboard() {
           {tab === 'playlist'    && <PlaylistTab scopeKelas={scopeKelas} />}
           {tab === 'timeline'    && isRoot && <TimelineTab />}
           {tab === 'settings'    && isRoot && <SettingsTab />}
+          {tab === 'eggphotos'  && isRoot && <EasterEggPhotosTab />}
           {tab === 'users'       && isRoot && <UsersTab session={session} />}
         </main>
       </div>
@@ -2305,6 +2307,166 @@ function EditTimelineModal({ item, onClose, onSave }: { item: TimelineItem | nul
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── EASTER EGG PHOTOS TAB (Root only) ─────────────────────────────
+function EasterEggPhotosTab() {
+  const [photos, setPhotos] = useState<{ id: string; url: string; caption: string; order_num: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [caption, setCaption] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState('');
+
+  const fetchPhotos = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.from('easter_egg_photos').select('*').order('order_num', { ascending: true });
+      if (data) setPhotos(data as any);
+    } catch { /* */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchPhotos(); }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED.includes(f.type)) { toast.error('Format tidak didukung!'); return; }
+    if (f.size > 5 * 1024 * 1024) { toast.error('Ukuran melebihi 5MB!'); return; }
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = () => setPreview(reader.result as string);
+    reader.readAsDataURL(f);
+  };
+
+  const handleUpload = async () => {
+    if (!file) { toast.error('Pilih foto dulu!'); return; }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `easter-egg/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const url = await uploadPhoto(file, path);
+      const nextOrder = photos.length > 0 ? Math.max(...photos.map(p => p.order_num)) + 1 : 1;
+      await supabase.from('easter_egg_photos').insert({ url, caption: caption.trim(), order_num: nextOrder });
+      toast.success('Foto berhasil ditambahkan! 🥚');
+      setFile(null); setPreview(''); setCaption('');
+      fetchPhotos();
+    } catch { toast.error('Gagal upload!'); }
+    setUploading(false);
+  };
+
+  const handleDelete = async (id: string, url: string) => {
+    if (!confirm('Hapus foto ini?')) return;
+    try {
+      await supabase.from('easter_egg_photos').delete().eq('id', id);
+      try { await deleteFileFromStorage(url); } catch { /* */ }
+      toast.success('Foto dihapus!');
+      fetchPhotos();
+    } catch { toast.error('Gagal menghapus!'); }
+  };
+
+  return (
+    <div>
+      <h1 className="font-display text-cream text-2xl font-bold mb-2">Easter Egg Photos 🥚</h1>
+      <p className="text-cream/40 text-sm font-body mb-8">
+        Kelola foto yang tampil di halaman tersembunyi <span className="text-gold font-heading">/mikhayl</span>.
+        Hanya admin root yang bisa mengatur ini.
+      </p>
+
+      {/* UPLOAD FORM */}
+      <div className="card-dark p-5 sm:p-6 mb-8">
+        <h2 className="font-display text-cream font-bold text-base mb-4">Tambah Foto Baru</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="section-label text-[10px] block mb-2">Pilih Foto (max 5MB)</label>
+            <input type="file" accept="image/*" onChange={handleFileChange}
+              className="w-full text-cream/60 text-xs file:btn-gold file:text-xs file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:cursor-pointer" />
+            {preview && (
+              <div className="mt-3 aspect-square max-w-[150px] rounded-xl overflow-hidden border border-gold/20">
+                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="section-label text-[10px] block mb-2">Caption (opsional)</label>
+            <input
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              placeholder="Deskripsi singkat foto..."
+              maxLength={80}
+              className="admin-input mb-3"
+            />
+            <button
+              onClick={handleUpload}
+              disabled={uploading || !file}
+              className="w-full btn-gold py-2.5 text-xs disabled:opacity-40"
+            >
+              {uploading ? 'Mengupload...' : '+ Upload Foto'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* PHOTO GRID */}
+      <div className="card-dark p-5 sm:p-6">
+        <h2 className="font-display text-cream font-bold text-base mb-1">Foto Tersimpan</h2>
+        <p className="text-cream/30 text-xs font-body mb-5">{photos.length} foto · Tampil di /mikhayl</p>
+
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => <div key={i} className="skeleton-card aspect-square" />)}
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="text-center py-16 text-cream/25 font-body text-sm">
+            Belum ada foto. Upload foto pertama di atas! 📷
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {photos.map((photo, i) => (
+              <div key={photo.id} className="relative group aspect-square rounded-xl overflow-hidden border border-gold/15 hover:border-gold/40 transition-all">
+                <img src={photo.url} alt={photo.caption || `Photo ${i+1}`}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                {photo.caption && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-charcoal-dark/90 to-transparent px-2 py-2">
+                    <p className="text-cream/80 text-[10px] font-body leading-snug truncate">{photo.caption}</p>
+                  </div>
+                )}
+                <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <span className="bg-charcoal-dark/80 text-cream/50 text-[9px] font-heading px-1.5 py-0.5 rounded"># {i+1}</span>
+                  <button
+                    onClick={() => handleDelete(photo.id, photo.url)}
+                    className="bg-red-900/80 hover:bg-red-700 text-white text-[10px] px-2 py-0.5 rounded transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* SQL Setup Note */}
+      <div className="mt-6 p-4 rounded-xl border border-gold/15 bg-gold/5">
+        <p className="text-gold/70 text-xs font-heading tracking-wide mb-1">💡 Catatan Setup Database</p>
+        <p className="text-cream/40 text-xs font-body">
+          Jika tabel <code className="text-gold/60">easter_egg_photos</code> belum ada, buat dengan SQL ini di Supabase Dashboard:
+        </p>
+        <pre className="mt-2 text-[10px] text-cream/50 font-mono overflow-x-auto bg-charcoal-dark/60 p-3 rounded-lg">{`CREATE TABLE easter_egg_photos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  url TEXT NOT NULL,
+  caption TEXT,
+  order_num INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE easter_egg_photos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read" ON easter_egg_photos FOR SELECT USING (true);
+CREATE POLICY "Admin write" ON easter_egg_photos FOR ALL USING (auth.role() = 'authenticated');`}</pre>
       </div>
     </div>
   );
