@@ -1,7 +1,7 @@
 // src/data/students.ts
 // ============================================================
 // DATA SANTRI — Angkatan 26 (2023-2026)
-// Sumber: kelas_9A.txt (Neutrino/Ikhwa) & kelas_9B.txt (All Axe/Akhwat)
+// Sumber: kelas_9A.txt (Neutrino/Ikhwa)
 // ============================================================
 
 export type Santri = {
@@ -14,14 +14,14 @@ export type Santri = {
   wa?: string;
   foto?: string;         // URL dari Supabase Storage
   quote?: string;
-  kelas: 'neutrino' | 'all-axe';
+  kelas: 'neutrino';
   jabatan?: 'ketua' | 'sekretaris' | 'bendahara' | 'anggota';
 };
 
 export type KelasInfo = {
-  id: 'neutrino' | 'all-axe';
+  id: 'neutrino';
   nama: string;
-  label: string;         // Ikhwa / Akhwat
+  label: string;         // Ikhwa
   waliKelas: string;
   totalSantri: number;
   angkatan: number;
@@ -66,20 +66,6 @@ export const neutrino: Santri[] = [
   { id: 'n-29', no: 29, nama: 'CHAFFA MOODUTO',                     tempatLahir: 'GORONTALO',         tanggalLahir: '2011-01-01', kelas: 'neutrino' },
 ];
 
-// ─── ALL AXE (9B — Akhwat/Putri) ─────────────────────────────
-export const allAxe: Santri[] = [
-  { id: 'a-01', no: 1,  nama: 'AIN TAHIR',                                    tempatLahir: 'KWANDANG',        tanggalLahir: '2010-08-03', kelas: 'all-axe' },
-  { id: 'a-02', no: 2,  nama: 'ALIFATUNNISAA LADIKU',                          tempatLahir: 'GORONTALO',       tanggalLahir: '2011-09-27', kelas: 'all-axe' },
-  { id: 'a-03', no: 3,  nama: 'ALYA ISTIQOMAH AZZAHRA LALU',                   tempatLahir: 'BULANGO SELATAN', tanggalLahir: '2011-01-01', kelas: 'all-axe' },
-  { id: 'a-04', no: 4,  nama: 'BALQIS ADIBA AZ\'ZAHRA I. WARTABONE',           tempatLahir: 'GORONTALO',       tanggalLahir: '2010-11-22', kelas: 'all-axe' },
-  { id: 'a-05', no: 5,  nama: 'CHIYA FAUZIYAH SOFYAN',                         tempatLahir: 'BUOL',            tanggalLahir: '2011-05-08', kelas: 'all-axe' },
-  { id: 'a-06', no: 6,  nama: 'FAKHIRAH HIKMAH RAMADHANI DUENGO',              tempatLahir: 'GORONTALO',       tanggalLahir: '2011-08-17', kelas: 'all-axe' },
-  { id: 'a-07', no: 7,  nama: 'MUTIA SALSABILA NOHO',                          tempatLahir: 'GORONTALO',       tanggalLahir: '2011-05-09', kelas: 'all-axe' },
-  { id: 'a-08', no: 8,  nama: 'SHARIFA FUKAYNA URBI ASWAN',                    tempatLahir: 'GORONTALO',       tanggalLahir: '2011-11-27', kelas: 'all-axe' },
-  { id: 'a-09', no: 9,  nama: 'WAFA AMATULLAH GANI',                           tempatLahir: 'GORONTALO',       tanggalLahir: '2011-07-05', kelas: 'all-axe' },
-  { id: 'a-10', no: 10, nama: 'ANAYA PUTRI KOIJO',                             tempatLahir: 'GORONTALO',       tanggalLahir: '2010-12-01', kelas: 'all-axe' },
-];
-
 // ─── KELAS INFO ───────────────────────────────────────────────
 export const kelasInfo: Record<string, KelasInfo> = {
   neutrino: {
@@ -96,21 +82,9 @@ export const kelasInfo: Record<string, KelasInfo> = {
     warna: '#C9A227',
     deskripsi: 'Angkatan Neutrino MTS Wahdah Islamiyah Bonebolango — partikel yang menembus segalanya, seperti tekad kami menembus batas ilmu. Shaped by time, brought together by a shared purpose.',
   },
-  'all-axe': {
-    id: 'all-axe',
-    nama: 'All Axe',
-    label: 'Akhwat (Putri)',
-    waliKelas: 'Ustadzah Ratna Muhi',
-    totalSantri: 10,
-    angkatan: 16,
-    tahun: '2023-2026',
-    ketua: '-',
-    warna: '#E8C5A0',
-    deskripsi: 'Angkatan All Axe MTS Wahdah Islamiyah Bonebolango — ketajaman bak kapak, membelah segala rintangan dengan iman dan ilmu yang teguh.',
-  },
 };
 
-export const allSantri: Santri[] = [...neutrino, ...allAxe];
+export const allSantri: Santri[] = [...neutrino];
 
 // Utility
 export const formatTTL = (tempat: string, tgl: string) => {

@@ -8,7 +8,7 @@ type TimelineEvent = {
   date: string;
   judul: string;
   deskripsi: string;
-  kelas: 'neutrino' | 'all-axe' | 'both';
+  kelas: 'neutrino' | 'both';
   type: 'hafalan' | 'lomba' | 'event' | 'asrama' | 'wisuda';
   emoji: string;
 };
@@ -23,7 +23,6 @@ const TIMELINE_DATA: TimelineEvent[] = [
   // KELAS 8 (2024)
   { id: 't6',  date: 'Juli 2024',     judul: 'Naik Kelas 8 — Awal Babak Baru',    deskripsi: 'Memasuki tahun kedua dengan semangat baru. Target hafalan ditingkatkan ke Juz 29.',                            kelas: 'both',     type: 'event',   emoji: '⬆️' },
   { id: 't7',  date: 'September 2024',judul: 'Lomba Tahfidz Tingkat Wilayah',      deskripsi: 'Neutrino mengirim 3 santri ke lomba tahfidz. Prestasi membanggakan untuk angkatan.',                            kelas: 'neutrino', type: 'lomba',   emoji: '🥇' },
-  { id: 't8',  date: 'Oktober 2024',  judul: 'Musabaqah Quran All Axe',            deskripsi: 'All Axe meraih juara dalam musabaqah tilawatil Quran tingkat pesantren. Bangga!',                              kelas: 'all-axe',  type: 'lomba',   emoji: '🎖️' },
   { id: 't9',  date: 'November 2024', judul: 'Rihlah Ke-2 — Wisata Alam',         deskripsi: 'Rihlah kedua ke destinasi alam. Foto bersama, permainan seru, dan kenangan manis.',                             kelas: 'both',     type: 'asrama',  emoji: '⛰️' },
   { id: 't10', date: 'Desember 2024', judul: 'Malam Keakraban Angkatan',          deskripsi: 'Event internal angkatan 26. Games, pertunjukan bakat, dan momen emosional kebersamaan.',                        kelas: 'both',     type: 'event',   emoji: '🌟' },
   // KELAS 9 (2025-2026)
@@ -31,7 +30,7 @@ const TIMELINE_DATA: TimelineEvent[] = [
   { id: 't12', date: 'Agustus 2025',  judul: 'Try Out Pertama',                   deskripsi: 'Persiapan ujian akhir dimulai. Belajar lebih keras demi kelulusan dan masa depan.',                            kelas: 'both',     type: 'event',   emoji: '📝' },
   { id: 't13', date: 'Oktober 2025',  judul: 'Completions Hafalan Quran',         deskripsi: 'Santri yang berhasil menyelesaikan target hafalan mendapat penghargaan khusus dari pesantren.',                 kelas: 'both',     type: 'hafalan', emoji: '✨' },
   { id: 't14', date: 'Februari 2026', judul: 'Persiapan Wisuda — Foto Kenangan',  deskripsi: 'Foto bersama resmi, pembuatan yearbook, dan berbagai kegiatan perpisahan mulai dipersiapkan.',                 kelas: 'both',     type: 'wisuda',  emoji: '📷' },
-  { id: 't15', date: 'Juni 2026',     judul: '🎓 WISUDA ANGKATAN 26',            deskripsi: 'Hari yang ditunggu-tunggu. Selamat kepada seluruh santri Angkatan 26 — Neutrino & All Axe. SOMO LULUS!',       kelas: 'both',     type: 'wisuda',  emoji: '🎓' },
+  { id: 't15', date: 'Juni 2026',     judul: '🎓 WISUDA ANGKATAN 26',            deskripsi: 'Hari yang ditunggu-tunggu. Selamat kepada seluruh santri Angkatan 26 — Neutrino. KITA LULUS!',               kelas: 'both',     type: 'wisuda',  emoji: '🎓' },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
@@ -52,12 +51,10 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function TimelinePage() {
   const [filter, setFilter] = useState<string>('all');
-  const [kelasFilter, setKelasFilter] = useState<string>('all');
   const router = useRouter();
 
   const filtered = TIMELINE_DATA.filter(e =>
-    (filter === 'all' || e.type === filter) &&
-    (kelasFilter === 'all' || e.kelas === kelasFilter || e.kelas === 'both')
+    (filter === 'all' || e.type === filter)
   );
 
   return (
@@ -96,18 +93,6 @@ export default function TimelinePage() {
               }`}
             >
               {t === 'all' ? 'Semua' : TYPE_LABELS[t]}
-            </button>
-          ))}
-          <div className="w-px bg-gold/20 mx-1" />
-          {['all','neutrino','all-axe'].map(k => (
-            <button
-              key={k}
-              onClick={() => setKelasFilter(k)}
-              className={`px-3 py-1 rounded-full text-xs font-heading tracking-wider uppercase transition-all border ${
-                kelasFilter === k ? 'border-gold-light bg-gold-light/20 text-gold-light' : 'border-gold/10 text-cream/30 hover:border-gold/30'
-              }`}
-            >
-              {k === 'all' ? 'Bersama' : k === 'neutrino' ? 'Neutrino' : 'All Axe'}
             </button>
           ))}
         </div>
@@ -149,7 +134,7 @@ function TimelineItem({ event, index, side }: { event: TimelineEvent; index: num
             <span className="text-2xl">{event.emoji}</span>
             <div className="flex-1">
               <div className="text-[10px] font-heading tracking-wider mb-1" style={{ color }}>
-                {event.date} · {event.kelas === 'both' ? 'Bersama' : event.kelas === 'neutrino' ? 'Neutrino' : 'All Axe'}
+                {event.date} · {event.kelas === 'both' ? 'Bersama' : 'Neutrino'}
               </div>
               <h3 className="font-display font-bold text-cream text-sm leading-tight">{event.judul}</h3>
             </div>

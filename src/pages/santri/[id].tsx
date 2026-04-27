@@ -90,8 +90,7 @@ export default function SantriDetailPage() {
     );
   }
 
-  const colorMap: Record<string, string> = { neutrino: '#C9A227', 'all-axe': '#E8C5A0' };
-  const accentColor = colorMap[santri.kelas] || '#C9A227';
+  const accentColor = '#C9A227';
   const initials = santri.nama.split(' ').slice(0, 2).map(w => w[0]).join('');
 
   return (
@@ -190,7 +189,7 @@ export default function SantriDetailPage() {
               <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border w-fit" style={{ borderColor: `${accentColor}40` }}>
                 <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
                 <span className="font-heading text-[10px] tracking-widest uppercase" style={{ color: accentColor }}>
-                  {santri.kelas === 'neutrino' ? 'Neutrino · Ikhwa' : 'All Axe · Akhwat'}
+                  Neutrino · Ikhwa
                 </span>
               </div>
 
@@ -227,7 +226,7 @@ export default function SantriDetailPage() {
                 </div>
                 <div className="card-dark p-4">
                   <div className="text-cream/30 text-[10px] font-heading tracking-wider uppercase mb-1">Kelas</div>
-                  <div className="text-cream text-sm font-display font-bold">🏫 {santri.kelas === 'neutrino' ? 'Neutrino 9A' : 'All Axe 9B'}</div>
+                  <div className="text-cream text-sm font-display font-bold">🏫 Neutrino 9A</div>
                 </div>
               </div>
 

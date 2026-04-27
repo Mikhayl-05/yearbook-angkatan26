@@ -33,7 +33,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<AdminTab>('dashboard');
   const [stats, setStats] = useState({ santri: 0, photos: 0, notes: 0, tracks: 0, pending: 0 });
 
-  const scopeKelas = userRole === 'manager_ikhwa' ? 'neutrino' : userRole === 'manager_akhwat' ? 'all-axe' : null;
+  const scopeKelas = userRole === 'manager_ikhwa' ? 'neutrino' : null;
   const isRoot = userRole === 'root';
 
   useEffect(() => {
@@ -231,7 +231,6 @@ function SantriTab({ scopeKelas }: { scopeKelas: string | null }) {
           <select value={kelasFilter} onChange={e => setKelasFilter(e.target.value)} className="admin-select max-w-[160px]">
             <option value="all">Semua Kelas</option>
             <option value="neutrino">Neutrino</option>
-            <option value="all-axe">All Axe</option>
           </select>
         ) : (
           <div className="admin-badge admin-badge-approved text-xs px-3 py-2">{scopeKelas}</div>
@@ -259,7 +258,7 @@ function SantriTab({ scopeKelas }: { scopeKelas: string | null }) {
               <tr key={s.id}>
                 <td className="font-mono text-gold/50 text-xs">{idx + 1}</td>
                 <td className="font-display font-bold text-sm whitespace-nowrap">{s.nama}</td>
-                <td><span className={`admin-badge ${s.kelas === 'neutrino' ? 'admin-badge-approved' : 'admin-badge-pending'}`}>{s.kelas}</span></td>
+                <td><span className={`admin-badge admin-badge-approved`}>{s.kelas}</span></td>
                 <td className="text-cream/50 text-xs capitalize whitespace-nowrap">{s.jabatan || 'anggota'}</td>
                 <td>{s.foto ? <div className="w-8 h-8 rounded-md overflow-hidden border border-gold/20"><img src={s.foto} className="w-full h-full object-cover" /></div> : <span className="text-cream/20 text-xs">—</span>}</td>
                 <td className="whitespace-nowrap">
@@ -520,7 +519,6 @@ function EditSantriModal({ scopeKelas, santri, onClose, onSave }: { scopeKelas: 
                   disabled={!!scopeKelas}
                 >
                   <option value="neutrino">Neutrino</option>
-                  <option value="all-axe">All Axe</option>
                 </select>
               </div>
             </div>
@@ -590,7 +588,7 @@ function AddSantriModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | 
   const handleSave = async () => {
     if (!form.nama || !form.tempat_lahir || !form.tanggal_lahir) { toast.error('Isi data lengkap!'); return; }
     setSaving(true);
-    const id = form.kelas === 'neutrino' ? `n-${String(form.no).padStart(2,'0')}` : `a-${String(form.no).padStart(2,'0')}`;
+    const id = `n-${String(form.no).padStart(2,'0')}`;
     try {
       await callAdminContent('POST', { resource: 'santri', data: { ...form, id } });
     } catch (err: any) {
@@ -616,7 +614,6 @@ function AddSantriModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | 
               <label className="section-label text-[10px] block mb-2">Kelas</label>
               <select value={scopeKelas ?? form.kelas} onChange={e => setForm(f=>({...f,kelas:e.target.value as any}))} className="admin-select" disabled={!!scopeKelas}>
                 <option value="neutrino">Neutrino</option>
-                <option value="all-axe">All Axe</option>
               </select>
             </div>
           </div>
@@ -926,7 +923,7 @@ function AddPhotoModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | n
 
   const allowedCategories = scopeKelas
     ? ['momen', 'rihlah', 'wisuda', 'keseharian', scopeKelas]
-    : ['momen', 'rihlah', 'wisuda', 'neutrino', 'all-axe', 'keseharian'];
+    : ['momen', 'rihlah', 'wisuda', 'neutrino', 'keseharian'];
 
   const handleUpload = async () => {
     if (!uploadFile) { toast.error('Pilih foto!'); return; }
@@ -1028,7 +1025,6 @@ function AddPhotoModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | n
                 <select value={scopeKelas ?? kelas} onChange={e => setKelas(e.target.value)} className="admin-select text-xs py-2" disabled={!!scopeKelas}>
                   <option value="all">Semua Kelas</option>
                   <option value="neutrino">Neutrino</option>
-                  <option value="all-axe">All Axe</option>
                 </select>
               </div>
             </div>
@@ -1586,36 +1582,6 @@ function SettingsTab() {
           </label>
         </div>
 
-        {/* All Axe BG */}
-        <div className="card-dark p-6">
-          <h3 className="text-cream text-sm font-display font-bold mb-1">Background All Axe</h3>
-          <p className="text-cream/40 text-xs mb-4">Foto latar di panel All Axe (halaman beranda). Foto akan ditampilkan dengan opacity rendah + efek fade.</p>
-          {allAxeBg ? (
-            <div className="relative mb-3">
-              <img src={allAxeBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
-              <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
-              <div className="absolute top-2 right-2">
-                <button
-                  onClick={() => handleResetBg('allaxe_bg_url', allAxeBg)}
-                  disabled={saving === 'allaxe_bg_url_reset'}
-                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
-                >
-                  🗑 Reset ke Default
-                </button>
-              </div>
-              <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview (dengan efek fade)</p>
-            </div>
-          ) : (
-            <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
-              <span className="text-cream/30 text-xs">Menggunakan foto default</span>
-            </div>
-          )}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'allaxe_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
-            {saving === 'allaxe_bg_url' ? '⏳ Uploading...' : '📷 Upload Background All Axe'}
-            <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('allaxe_bg_url', e)} disabled={!!saving} />
-          </label>
-        </div>
-
         {/* OG Image Preview */}
         <div className="card-dark p-6">
           <h3 className="text-cream text-sm font-display font-bold mb-1">Foto Preview Web (Open Graph)</h3>
@@ -1655,7 +1621,7 @@ type UserRow = {
   full_name: string;
   created_at: string;
   last_sign_in: string | null;
-  role: 'root' | 'manager_ikhwa' | 'manager_akhwat' | null;
+  role: 'root' | 'manager_ikhwa' | null;
   is_admin: boolean;
   is_owner?: boolean;
   is_hardcoded_root?: boolean;
@@ -1674,7 +1640,7 @@ function UsersTab({ session }: { session: any }) {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<'root' | 'manager_ikhwa' | 'manager_akhwat' | null>(null);
+  const [newRole, setNewRole] = useState<'root' | 'manager_ikhwa' | null>(null);
   const [creating, setCreating] = useState(false);
 
   const getToken = async (): Promise<string> => {
@@ -1796,7 +1762,6 @@ function UsersTab({ session }: { session: any }) {
               <select value={newRole ?? ''} onChange={e => setNewRole((e.target.value || null) as any)} className="admin-select">
                 <option value="">Santri (tanpa akses admin)</option>
                 <option value="manager_ikhwa">Manager (Ikhwa)</option>
-                <option value="manager_akhwat">Manager (Akhwat)</option>
                 <option value="root">Admin Root</option>
               </select>
             </div>
@@ -1876,7 +1841,6 @@ function UsersTab({ session }: { session: any }) {
                     <div className="flex gap-1 flex-wrap">
                       {u.role === 'root' && <span className="admin-badge admin-badge-approved">👑 Root</span>}
                       {u.role === 'manager_ikhwa' && <span className="admin-badge admin-badge-approved">🧔 Manager Ikhwa</span>}
-                      {u.role === 'manager_akhwat' && <span className="admin-badge admin-badge-approved">👩 Manager Akhwat</span>}
                       {!u.role && <span className="admin-badge" style={{background:'rgba(201,162,39,0.08)',color:'rgba(245,240,232,0.4)',border:'1px solid rgba(201,162,39,0.15)'}}>Santri</span>}
                       {u.is_owner && <span className="admin-badge admin-badge-approved">Root Utama</span>}
                     </div>
@@ -2028,7 +1992,6 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRow; onClose: () =
                 {[
                   { id: '', label: 'Santri', desc: 'Akses lihat konten', icon: '📖' },
                   { id: 'manager_ikhwa', label: 'Manager Ikhwa', desc: 'Data Neutrino', icon: '🧔' },
-                  { id: 'manager_akhwat', label: 'Manager Akhwat', desc: 'Data All Axe', icon: '👩' },
                   { id: 'root', label: 'Root Admin', desc: 'Akses penuh', icon: '👑' },
                 ].map((roleOption) => {
                   const isSelected = form.role === roleOption.id;
@@ -2315,7 +2278,7 @@ function EditTimelineModal({ item, onClose, onSave }: { item: TimelineItem | nul
           <div className="opacity-0 animate-fade-in-fast animate-stagger-5">
             <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Target Kelas</label>
             <div className="grid grid-cols-3 gap-2">
-              {['both', 'neutrino', 'all-axe'].map(k => (
+              {['both', 'neutrino'].map(k => (
                 <button 
                   key={k} 
                   onClick={() => setForm(f => ({ ...f, kelas: k as any }))}

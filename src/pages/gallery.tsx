@@ -9,7 +9,7 @@ import type { GalleryItem } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
 
-type Category = 'all' | 'momen' | 'rihlah' | 'wisuda' | 'keseharian' | 'neutrino' | 'all-axe';
+type Category = 'all' | 'momen' | 'rihlah' | 'wisuda' | 'keseharian' | 'neutrino';
 
 const CATEGORY_LABELS: Record<Category, string> = {
   all: 'Semua',
@@ -17,7 +17,6 @@ const CATEGORY_LABELS: Record<Category, string> = {
   rihlah: '🌙 Rihlah',
   wisuda: '🎓 Wisuda',
   neutrino: '⚡ Neutrino',
-  'all-axe': '🪓 All Axe',
   keseharian: '☀️ Keseharian',
 };
 
@@ -56,6 +55,23 @@ export default function GalleryPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // ── Security: validate file type & size ──────────────────
+    const MAX_SIZE_MB = 5;
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_EXTS = /\.(jpg|jpeg|png|webp|gif)$/i;
+
+    if (!ALLOWED_TYPES.includes(file.type) || !ALLOWED_EXTS.test(file.name)) {
+      toast.error('Format tidak didukung! Gunakan JPG, PNG, WEBP, atau GIF.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      toast.error(`Ukuran file melebihi ${MAX_SIZE_MB}MB. Kompres foto terlebih dahulu.`);
+      e.target.value = '';
+      return;
+    }
+
     setUploadFile(file);
     const reader = new FileReader();
     reader.onload = () => setUploadPreview(reader.result as string);
@@ -198,7 +214,6 @@ export default function GalleryPage() {
                     <option value="rihlah">Rihlah</option>
                     <option value="wisuda">Wisuda</option>
                     <option value="neutrino">Neutrino</option>
-                    <option value="all-axe">All Axe</option>
                     <option value="keseharian">Keseharian</option>
                   </select>
                 </div>
@@ -207,7 +222,6 @@ export default function GalleryPage() {
                   <select value={uploadKelas} onChange={e => setUploadKelas(e.target.value)} className="admin-select">
                     <option value="all">Semua</option>
                     <option value="neutrino">Neutrino</option>
-                    <option value="all-axe">All Axe</option>
                   </select>
                 </div>
               </div>

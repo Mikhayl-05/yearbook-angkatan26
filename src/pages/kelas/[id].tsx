@@ -1,13 +1,101 @@
 // src/pages/kelas/[id].tsx
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import StudentCard from '@/components/sections/StudentCard';
 import KelasHeader from '@/components/sections/KelasHeader';
 import { kelasInfo } from '@/data/students';
 import { supabase } from '@/lib/supabase';
 import type { SantriDB, GuruDB } from '@/lib/supabase';
+import Head from 'next/head';
 
+// ─── REMOVED PAGE (for /kelas/all-axe or unknown class) ────────
+function RemovedPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <>
+      <Head>
+        <title>Halaman Dihapus | Yearbook Angkatan 26</title>
+        <meta name="robots" content="noindex" />
+      </Head>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden"
+        style={{ background: 'radial-gradient(ellipse at center, #1a1005 0%, #0c0a09 60%, #050403 100%)' }}
+      >
+        {/* Ambient particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-1 h-1 rounded-full bg-gold opacity-0"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animation: `particleDrift ${8 + Math.random() * 6}s ease-in infinite`,
+                animationDelay: `${Math.random() * 4}s`,
+                '--dx': `${(Math.random() - 0.5) * 60}px`,
+              } as React.CSSProperties}
+            />
+          ))}
+        </div>
+
+        {/* Top/bottom accent lines */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/25 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/25 to-transparent" />
+
+        <div className={`relative z-10 text-center max-w-lg transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          {/* Icon */}
+          <div className="w-24 h-24 rounded-full border border-gold/20 bg-charcoal-dark/60 flex items-center justify-center mx-auto mb-8 shadow-[0_0_60px_rgba(201,162,39,0.1)]">
+            <span className="text-5xl">🗂️</span>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <div className="w-12 h-px bg-gradient-to-r from-transparent to-gold/40" />
+            <div className="w-1.5 h-1.5 rounded-full bg-gold/40 animate-pulse" />
+            <div className="w-12 h-px bg-gradient-to-l from-transparent to-gold/40" />
+          </div>
+
+          {/* Message */}
+          <div className="section-label text-[10px] mb-4">Konten Tidak Tersedia</div>
+          <h1 className="font-display font-black text-cream text-3xl sm:text-4xl mb-4 leading-tight">
+            Maaf, halaman ini<br />
+            <span className="text-gold-gradient">telah dihapus</span>
+          </h1>
+          <p className="text-cream/50 font-body text-sm leading-relaxed mb-10 max-w-md mx-auto">
+            Halaman yang kamu akses sudah tidak tersedia lagi.
+            Kamu bisa kembali ke beranda atau menjelajahi konten lainnya.
+          </p>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
+            <Link href="/" className="btn-gold text-xs px-8 py-3">
+              ← Kembali ke Beranda
+            </Link>
+            <Link href="/kelas/neutrino" className="btn-outline-gold text-xs px-6 py-3">
+              ⚡ Lihat Neutrino
+            </Link>
+          </div>
+
+          {/* Footer note */}
+          <div className="pt-6 border-t border-gold/10">
+            <p className="text-cream/20 text-[10px] font-body">
+              Yearbook Angkatan 26 · Neutrino · MTS Wahdah Islamiyah Bonebolango
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── MAIN KELAS PAGE ─────────────────────────────────────────────
 export default function KelasPage() {
   const router = useRouter();
   const { id: kelasId } = router.query;
@@ -19,7 +107,7 @@ export default function KelasPage() {
   const info = kelasId ? kelasInfo[kelasId as string] : null;
 
   useEffect(() => {
-    if (!kelasId) return;
+    if (!kelasId || !info) return;
     fetchData();
   }, [kelasId]);
 
@@ -41,7 +129,11 @@ export default function KelasPage() {
     s.tempat_lahir.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (!kelasId || !info) return null;
+  // Show removed page for unknown/removed kelas
+  if (kelasId && !info) return <RemovedPage />;
+
+  // Still loading the route
+  if (!kelasId) return null;
 
   return (
     <div className="min-h-screen dark-paper">
@@ -59,7 +151,7 @@ export default function KelasPage() {
       </div>
 
       {/* HEADER */}
-      <KelasHeader info={info} />
+      <KelasHeader info={info!} />
 
       {/* SEARCH BAR */}
       <div className="sticky top-16 md:top-20 z-30 bg-charcoal-dark/90 backdrop-blur-md border-b border-gold/10 py-3 px-4">
@@ -126,7 +218,6 @@ export default function KelasPage() {
         )}
 
         {loading ? (
-          // Skeleton loading
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="skeleton-card">

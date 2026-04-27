@@ -11,7 +11,7 @@ type AuthContextType = {
   isAdmin: boolean;
   userRole: UserRole;
   isRootAdmin: boolean;
-  managerKelas: 'neutrino' | 'all-axe' | null;
+  managerKelas: 'neutrino' | null;
   loading: boolean;
   userName: string;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data } = await supabase.from('admin_users').select('role').eq('email', lowerEmail).maybeSingle();
       const dbRole = data?.role as UserRole;
-      if (dbRole && ['root', 'manager_ikhwa', 'manager_akhwat'].includes(dbRole)) {
+      if (dbRole && ['root', 'manager_ikhwa'].includes(dbRole)) {
         setIsAdmin(true);
         setUserRole(dbRole);
       } else {

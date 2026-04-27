@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { HARDCODED_ROOT_ADMINS, ROOT_OWNER_EMAIL, isHardcodedRootAdmin, type UserRole } from '@/lib/adminRoles';
 
-const ALLOWED_ROLES: UserRole[] = ['root', 'manager_ikhwa', 'manager_akhwat'];
+const ALLOWED_ROLES: UserRole[] = ['root', 'manager_ikhwa'];
 const isValidRole = (role: unknown): role is UserRole => typeof role === 'string' && ALLOWED_ROLES.includes(role as UserRole);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

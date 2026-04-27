@@ -119,7 +119,7 @@ export default function QuotesPage() {
       <div className="sticky top-16 md:top-20 z-30 bg-charcoal-dark/90 backdrop-blur-md border-b border-gold/10 py-3 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 flex-wrap">
           <div className="flex gap-2">
-            {['all','neutrino','all-axe','general'].map(k => (
+            {['all','neutrino','general'].map(k => (
               <button
                 key={k}
                 onClick={() => setKelasFilter(k)}
@@ -127,7 +127,7 @@ export default function QuotesPage() {
                   kelasFilter === k ? 'bg-gold text-charcoal-dark border-gold' : 'border-gold/20 text-cream/40 hover:border-gold/40'
                 }`}
               >
-                {k === 'all' ? 'Semua' : k === 'neutrino' ? 'Neutrino' : k === 'all-axe' ? 'All Axe' : 'Umum'}
+                {k === 'all' ? 'Semua' : k === 'neutrino' ? 'Neutrino' : 'Umum'}
               </button>
             ))}
           </div>

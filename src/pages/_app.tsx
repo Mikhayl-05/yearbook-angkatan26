@@ -54,7 +54,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <>
       <Head>
         <title>Yearbook Angkatan 26 — MTS Wahdah Islamiyah</title>
-        <meta name="description" content="Digital Yearbook Angkatan 26 MTS Pondok Pesantren Wahdah Islamiyah Bonebolango — Neutrino & All Axe 2023-2026" />
+        <meta name="description" content="Digital Yearbook Angkatan 26 MTS Pondok Pesantren Wahdah Islamiyah Bonebolango — Neutrino 2023-2026" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <meta name="theme-color" content="#C9A227" />
         <meta name="application-name" content="YB-A26" />
@@ -63,7 +63,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta name="apple-mobile-web-app-title" content="YB-A26" />
         {/* OG Tags */}
         <meta property="og:title" content="Yearbook Angkatan 26 — MTS Wahdah Islamiyah Bonebolango" />
-        <meta property="og:description" content="Kenangan digital Angkatan 26 MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
+        <meta property="og:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
         <meta property="og:type" content="website" />
         {/* Icons */}
         <link rel="icon" href="/icons/icon-192x192.png" />

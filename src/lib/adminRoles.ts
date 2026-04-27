@@ -1,4 +1,4 @@
-export type UserRole = 'root' | 'manager_ikhwa' | 'manager_akhwat';
+export type UserRole = 'root' | 'manager_ikhwa';
 
 export const ROOT_OWNER_EMAIL = 'admin@yearbookangkatan26.com';
 
@@ -12,8 +12,7 @@ export const isHardcodedRootAdmin = (email?: string | null): boolean => {
   return HARDCODED_ROOT_ADMINS.includes(email as (typeof HARDCODED_ROOT_ADMINS)[number]);
 };
 
-export const roleToKelasScope = (role: UserRole | null): 'neutrino' | 'all-axe' | null => {
+export const roleToKelasScope = (role: UserRole | null): 'neutrino' | null => {
   if (role === 'manager_ikhwa') return 'neutrino';
-  if (role === 'manager_akhwat') return 'all-axe';
   return null;
 };

@@ -67,11 +67,7 @@ const normalizePhone = (phone: string): string => {
 
 const getPlaceholderAvatar = (nama: string, kelas: string) => {
   const initials = nama.split(' ').slice(0, 2).map(w => w[0]).join('');
-  const colorMap: Record<string, string> = {
-    neutrino: '#C9A227',
-    'all-axe': '#E8C5A0',
-  };
-  const color = colorMap[kelas] || '#C9A227';
+  const color = '#C9A227';
   return { initials, color };
 };
 

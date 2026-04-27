@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAdmin } from '@/lib/server/adminAuth';
 
-const pickAllowedKelas = (scope: 'neutrino' | 'all-axe' | null, requested?: string) => {
+const pickAllowedKelas = (scope: 'neutrino' | null, requested?: string) => {
   if (!scope) return requested;
   return scope;
 };

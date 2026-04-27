@@ -471,18 +471,14 @@ img {
   75% { transform: translateX(2px); }
 }
 
-/* ─── SPLIT SCREEN ───────────────────────────────────────── */
-.split-screen {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* ─── HERO LAYOUT (was split-screen, now full-width) ─────── */
+.neutrino-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 100vh;
-}
-
-@media (max-width: 768px) {
-  .split-screen {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
-  }
+  position: relative;
 }
 
 /* ─── MAGAZINE LAYOUT ────────────────────────────────────── */

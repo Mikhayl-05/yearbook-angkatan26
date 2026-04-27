@@ -7,7 +7,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ─── ROLE TYPES ───────────────────────────────────────────────
-export type UserRole = 'root' | 'manager_ikhwa' | 'manager_akhwat';
+export type UserRole = 'root' | 'manager_ikhwa';
 
 // ─── AUTH HELPERS ─────────────────────────────────────────────
 export const signIn = async (email: string, password: string) => {
@@ -41,7 +41,7 @@ export type StickyNote = {
   color: string;
   rotation: number;
   created_at: string;
-  kelas: 'neutrino' | 'all-axe' | 'general';
+  kelas: 'neutrino' | 'general';
 };
 
 export const getStickyNotes = async (kelas?: string) => {
@@ -173,7 +173,7 @@ export type SantriDB = {
   nama: string;
   tempat_lahir: string;
   tanggal_lahir: string;
-  kelas: 'neutrino' | 'all-axe';
+  kelas: 'neutrino';
   jabatan?: string;
   instagram?: string;
   wa?: string;
@@ -234,7 +234,7 @@ export type GuruDB = {
   id: string;
   nama: string;
   jabatan_guru: string;
-  kelas: 'neutrino' | 'all-axe';
+  kelas: 'neutrino';
   foto?: string;
   deskripsi?: string;
   instagram?: string;
@@ -312,7 +312,7 @@ export type TimelineItem = {
   date: string;
   judul: string;
   deskripsi: string;
-  kelas: 'neutrino' | 'all-axe' | 'both';
+  kelas: 'neutrino' | 'both';
   type: 'hafalan' | 'lomba' | 'event' | 'asrama' | 'wisuda';
   emoji: string;
   created_at: string;

@@ -48,7 +48,7 @@ export default function GuruDetailPage() {
     <div className="min-h-screen dark-paper"><Navbar /><div className="flex flex-col items-center justify-center min-h-screen gap-4"><div className="text-cream/30 text-xl font-display">Guru tidak ditemukan</div><Link href="/" className="btn-outline-gold text-xs py-2 px-6">Kembali</Link></div></div>
   );
 
-  const accentColor = guru.kelas === 'neutrino' ? '#C9A227' : '#E8C5A0';
+  const accentColor = '#C9A227';
   const initials = guru.nama.split(' ').slice(0, 2).map(w => w[0]).join('');
 
   return (
@@ -95,7 +95,7 @@ export default function GuruDetailPage() {
             <div className="lg:w-[45%] flex flex-col">
               <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border w-fit" style={{ borderColor: `${accentColor}40` }}>
                 <span className="text-sm">🎓</span>
-                <span className="font-heading text-[10px] tracking-widest uppercase" style={{ color: accentColor }}>{guru.jabatan_guru} · {guru.kelas === 'neutrino' ? 'Neutrino' : 'All Axe'}</span>
+                <span className="font-heading text-[10px] tracking-widest uppercase" style={{ color: accentColor }}>{guru.jabatan_guru} · Neutrino</span>
               </div>
               <h1 className="font-display font-black text-cream text-3xl md:text-4xl lg:text-5xl leading-tight mb-4 text-gold-gradient">{guru.nama}</h1>
               {guru.deskripsi && (

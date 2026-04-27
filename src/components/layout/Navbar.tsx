@@ -8,7 +8,6 @@ import { useMusic } from '@/context/MusicContext';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/kelas/neutrino', label: 'Neutrino' },
-  { href: '/kelas/all-axe', label: 'All Axe' },
   { href: '/gallery', label: 'Gallery' },
   { href: '/timeline', label: 'Timeline' },
   { href: '/quotes', label: 'Quotes Wall' },

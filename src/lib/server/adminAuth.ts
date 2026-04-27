@@ -6,7 +6,7 @@ export type AdminAuthResult = {
   adminClient: any;
   user: User;
   role: UserRole;
-  kelasScope: 'neutrino' | 'all-axe' | null;
+  kelasScope: 'neutrino' | null;
 };
 
 export const requireAdmin = async (req: NextApiRequest): Promise<AdminAuthResult> => {
@@ -30,7 +30,7 @@ export const requireAdmin = async (req: NextApiRequest): Promise<AdminAuthResult
     role = 'root';
   } else {
     const { data } = await adminClient.from('admin_users').select('role').eq('email', user.email).maybeSingle();
-    if (data?.role && ['root', 'manager_ikhwa', 'manager_akhwat'].includes(data.role)) {
+    if (data?.role && ['root', 'manager_ikhwa'].includes(data.role)) {
       role = data.role as UserRole;
     }
   }

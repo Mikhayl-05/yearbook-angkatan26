@@ -59,7 +59,6 @@ export default function GalleryDetailPage() {
     wisuda: '🎓 Wisuda',
     keseharian: '☀️ Keseharian',
     neutrino: '⚡ Neutrino',
-    'all-axe': '🪓 All Axe',
   };
 
   return (

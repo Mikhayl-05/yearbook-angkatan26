@@ -26,11 +26,8 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
   const [mounted, setMounted] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const [splashOut, setSplashOut] = useState(false);
-  const [hoverSide, setHoverSide] = useState<null | 'left' | 'right'>(null);
   const [neutrinoBg, setNeutrinoBg] = useState('');
-  const [allAxeBg, setAllAxeBg] = useState('');
   const [neutrinoCount, setNeutrinoCount] = useState(29);
-  const [allAxeCount, setAllAxeCount] = useState(10);
   const containerRef = useRef<HTMLDivElement>(null);
   const { play, isReady } = useMusic();
 
@@ -66,15 +63,11 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
         if (data) {
           data.forEach((s: { key: string; value: string }) => {
             if (s.key === 'neutrino_bg_url' && s.value) setNeutrinoBg(s.value);
-            if (s.key === 'allaxe_bg_url' && s.value) setAllAxeBg(s.value);
           });
         }
         
         const { count: c1 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'neutrino');
         if (c1 !== null) setNeutrinoCount(c1);
-        
-        const { count: c2 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'all-axe');
-        if (c2 !== null) setAllAxeCount(c2);
       } catch { /* */ }
     })();
   }, []);
@@ -140,7 +133,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
 
             <div className="flex items-center gap-4 mb-2 text-gold/60">
               <div className="w-12 h-px bg-gradient-to-r from-transparent to-gold/50" />
-              <span className="font-heading text-xs tracking-widest uppercase">Neutrino · All Axe</span>
+              <span className="font-heading text-xs tracking-widest uppercase">Neutrino</span>
               <div className="w-12 h-px bg-gradient-to-l from-transparent to-gold/50" />
             </div>
 
@@ -158,13 +151,6 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
               {isReady ? 'Masuk →' : 'Memuat Kenangan...'}
             </button>
           </div>
-
-          <style>{`
-            @keyframes splashProgress {
-              from { width: 0%; }
-              to   { width: 100%; }
-            }
-          `}</style>
         </div>
       )}
 
@@ -178,127 +164,78 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
         <Navbar />
         <GoldParticles count={30} />
 
-        {/* ── HERO SPLIT SCREEN ──────────────────────────── */}
-        <div className="split-screen min-h-screen relative">
+        {/* ── HERO — FULL WIDTH NEUTRINO ──────────────────── */}
+        <div className="neutrino-hero min-h-screen relative flex items-center justify-center overflow-hidden">
+          {/* BG IMAGE with cinematic overlay */}
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-[1.5s] ease-out"
+            style={{
+              backgroundImage: neutrinoBg
+                ? `url('${neutrinoBg}')`
+                : `url('/images/neutrino-group.jpg'), linear-gradient(135deg, #0c0a09 0%, #1c1917 100%)`,
+              opacity: neutrinoBg ? 0.4 : 1,
+              transform: mounted ? 'scale(1)' : 'scale(1.1)',
+            }}
+          />
+          {/* Multi-layer gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/70 via-charcoal-dark/30 to-charcoal-dark/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-charcoal-dark/60 via-transparent to-charcoal-dark/60" />
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(12,10,9,0.7) 100%)' }} />
+          
+          {/* Animated gold lines */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
 
-          {/* ─── LEFT: NEUTRINO (Ikhwa) ──────────────────── */}
-          <Link
-            href="/kelas/neutrino"
-            className="relative flex flex-col items-center justify-center overflow-hidden group cursor-pointer"
-            onMouseEnter={() => setHoverSide('left')}
-            onMouseLeave={() => setHoverSide(null)}
-          >
-            {/* BG IMAGE with reduced opacity */}
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-              style={{
-                backgroundImage: neutrinoBg
-                  ? `url('${neutrinoBg}')`
-                  : `url('/images/neutrino-group.jpg'), linear-gradient(135deg, #0c0a09 0%, #1c1917 100%)`,
-                opacity: neutrinoBg ? 0.55 : 1,
-              }}
-            />
-            {/* Fade gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/80 via-charcoal-dark/40 to-charcoal-dark/90 transition-all duration-500" />
-            {/* Extra dark vignette for readability */}
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(12,10,9,0.6) 100%)' }} />
-            {/* GOLD SIDE BORDER */}
-            <div className="absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-gold to-transparent opacity-60" />
+          {/* CONTENT */}
+          <div className={`relative z-10 text-center px-6 sm:px-8 max-w-4xl mx-auto transition-all duration-1000 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
+            {/* Class Badge */}
+            <div className="inline-flex items-center gap-2 mb-8 px-5 py-2 border border-gold/30 rounded-full backdrop-blur-sm bg-charcoal-dark/30">
+              <div className="w-2 h-2 rounded-full bg-gold animate-pulse" />
+              <span className="section-label text-[10px]">Ikhwa · Putra · Angkatan XVI</span>
+            </div>
 
-            {/* CONTENT */}
-            <div className={`relative z-10 text-center px-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 border border-gold/40 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
-                <span className="section-label text-[10px]">Ikhwa · Putra</span>
+            {/* Main Title */}
+            <div className="display-title text-gold-gradient mb-4" style={{ fontSize: 'clamp(4rem, 15vw, 12rem)' }}>NEUTRINO</div>
+            <div className="font-script text-gold/70 text-3xl sm:text-4xl mb-2">of Generation</div>
+            <div className="section-label text-cream/40 text-[10px] mb-10 tracking-[0.5em]">MTS Wahdah Islamiyah · Bonebolango · 2023–2026</div>
+
+            {/* Stats Row */}
+            <div className="flex justify-center gap-6 sm:gap-12 mb-10">
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-display font-bold text-gold">{neutrinoCount}</div>
+                <div className="text-cream/40 text-xs font-heading tracking-wider uppercase mt-1">Santri</div>
               </div>
-              <div className="display-title text-gold-gradient mb-2">NEUTRINO</div>
-              <div className="font-script text-gold/80 text-2xl mb-1">of Generation</div>
-              <div className="section-label text-cream/50 text-[10px] mb-6">Angkatan XVI · 2023–2026</div>
-              <div className="flex justify-center gap-8 mb-8">
-                <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">{neutrinoCount}</div>
-                  <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Santri</div>
-                </div>
-                <div className="w-px bg-gold/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">3</div>
-                  <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Tahun</div>
-                </div>
+              <div className="w-px bg-gold/20 self-stretch" />
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-display font-bold text-gold">3</div>
+                <div className="text-cream/40 text-xs font-heading tracking-wider uppercase mt-1">Tahun</div>
               </div>
-              <div className={`transition-all duration-500 ${hoverSide === 'left' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                <span className="btn-gold inline-block text-xs">Lihat Kelas →</span>
+              <div className="w-px bg-gold/20 self-stretch" />
+              <div className="text-center">
+                <div className="text-3xl sm:text-4xl font-display font-bold text-gold">XVI</div>
+                <div className="text-cream/40 text-xs font-heading tracking-wider uppercase mt-1">Angkatan</div>
               </div>
             </div>
 
-            <div className="absolute bottom-8 left-8 right-8 text-center">
-              <div className="text-cream/30 text-xs font-heading tracking-wider uppercase">Wali Kelas</div>
-              <div className="text-gold/70 text-sm font-display">Ustadz Taufik Hidayat</div>
-            </div>
-          </Link>
+            {/* CTA Button */}
+            <Link
+              href="/kelas/neutrino"
+              className="btn-gold inline-block text-xs px-10 py-4 hover:shadow-[0_0_50px_rgba(201,162,39,0.5)] transition-all duration-500"
+            >
+              Lihat Kelas Neutrino →
+            </Link>
 
-          {/* ─── RIGHT: ALL AXE (Akhwat) ─────────────────── */}
-          <Link
-            href="/kelas/all-axe"
-            className="relative flex flex-col items-center justify-center overflow-hidden group cursor-pointer"
-            onMouseEnter={() => setHoverSide('right')}
-            onMouseLeave={() => setHoverSide(null)}
-          >
-            {/* BG IMAGE with reduced opacity */}
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-              style={{
-                backgroundImage: allAxeBg
-                  ? `url('${allAxeBg}')`
-                  : `url('/images/allaxe-group.jpg'), linear-gradient(135deg, #1c1917 0%, #0c0a09 100%)`,
-                opacity: allAxeBg ? 0.55 : 1,
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/80 via-charcoal-dark/40 to-charcoal-dark/90 transition-all duration-500" />
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 40%, rgba(12,10,9,0.6) 100%)' }} />
-
-            {/* CONTENT */}
-            <div className={`relative z-10 text-center px-8 transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <div className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 border border-gold/40 rounded-full">
-                <div className="w-1.5 h-1.5 rounded-full bg-gold-light animate-pulse" />
-                <span className="section-label text-[10px]">Akhwat · Putri</span>
-              </div>
-              <div className="display-title text-gold-gradient mb-2">ALL AXE</div>
-              <div className="font-script text-gold/80 text-2xl mb-1">of Generation</div>
-              <div className="section-label text-cream/50 text-[10px] mb-6">Angkatan XVI · 2023–2026</div>
-              <div className="flex justify-center gap-8 mb-8">
-                <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">{allAxeCount}</div>
-                  <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Santri</div>
-                </div>
-                <div className="w-px bg-gold/20" />
-                <div className="text-center">
-                  <div className="text-2xl font-display font-bold text-gold">3</div>
-                  <div className="text-cream/50 text-xs font-heading tracking-wider uppercase">Tahun</div>
-                </div>
-              </div>
-              <div className={`transition-all duration-500 ${hoverSide === 'right' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                <span className="btn-gold inline-block text-xs">Lihat Kelas →</span>
-              </div>
-            </div>
-
-            <div className="absolute bottom-8 left-8 right-8 text-center">
-              <div className="text-cream/30 text-xs font-heading tracking-wider uppercase">Wali Kelas</div>
-              <div className="text-gold/70 text-sm font-display">Ustadzah Ratna Muhi</div>
-            </div>
-          </Link>
-
-          {/* CENTER LOGO OVERLAY */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none hidden sm:block">
-            <div className="w-16 h-16 rounded-full border-2 border-gold bg-charcoal-dark/90 backdrop-blur-sm flex flex-col items-center justify-center shadow-gold animate-pulse-gold">
-              <div className="text-gold font-heading font-bold text-base leading-none">26</div>
-              <div className="text-gold/60 font-heading text-[8px] tracking-widest">XVI</div>
+            {/* Wali Kelas */}
+            <div className="mt-12 pt-8 border-t border-gold/10">
+              <div className="text-cream/25 text-xs font-heading tracking-wider uppercase">Wali Kelas</div>
+              <div className="text-gold/60 text-sm font-display mt-1">Ustadz Taufik Hidayat</div>
             </div>
           </div>
 
-          {/* SCROLL INDICATOR — fixed at absolute bottom, never jumps */}
-          <div className="absolute bottom-6 left-0 right-0 z-10 flex flex-col items-center gap-1 text-cream/30 pointer-events-none select-none">
+          {/* SCROLL INDICATOR */}
+          <div className="absolute bottom-8 left-0 right-0 z-10 flex flex-col items-center gap-1 text-cream/30 pointer-events-none select-none">
             <span className="section-label text-[9px]">Scroll</span>
-            <div className="w-px h-6 bg-gradient-to-b from-gold/40 to-transparent" />
+            <div className="w-px h-8 bg-gradient-to-b from-gold/40 to-transparent animate-pulse" />
           </div>
         </div>
 
@@ -331,8 +268,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
                 <div className="divider-gold w-24" />
                 <p className="text-cream/70 font-body text-sm leading-loose mt-4 mb-6">
                   Pondok Pesantren Wahdah Islamiyah Bonebolango mencetak generasi yang berlandaskan iman dan ilmu.
-                  Angkatan ke-26 MTS — terdiri dari <strong className="text-gold">Neutrino</strong> (Ikhwa/Putra)
-                  dan <strong className="text-gold">All Axe</strong> (Akhwat/Putri) — menyelesaikan perjalanan
+                  Angkatan ke-26 MTS — <strong className="text-gold">Neutrino</strong> (Ikhwa/Putra) — menyelesaikan perjalanan
                   tiga tahun penuh kenangan, hafalan, dan perjuangan bersama.
                 </p>
                 <div className="flex gap-4">
@@ -343,7 +279,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
 
               <div className="col-span-12 md:col-span-7 grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Total Santri', value: String(neutrinoCount + allAxeCount), sub: 'Ikhwa & Akhwat' },
+                  { label: 'Total Santri', value: String(neutrinoCount), sub: 'Kelas Neutrino' },
                   { label: 'Angkatan Ke', value: 'XVI', sub: 'Sejak Berdiri' },
                   { label: 'Tahun Bersama', value: '3', sub: '2023–2026' },
                   { label: 'Hafalan', value: '∞', sub: 'Juz Al-Quran' },
