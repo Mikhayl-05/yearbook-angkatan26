@@ -1,6 +1,5 @@
 // src/pages/login.tsx
-// Fix: register button bug (captcha token timing), improved UX
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
@@ -9,67 +8,6 @@ import Head from 'next/head';
 
 type AuthMode = 'login' | 'register';
 
-// ── Cloudflare Turnstile (CDN, no npm needed) ─────────────────────
-// Uses global callback approach — more reliable than ref-based rendering
-// because it doesn't depend on DOM timing.
-const CALLBACK_PREFIX = '__ts_cb_';
-
-function TurnstileWidget({ siteKey, onVerify }: { siteKey: string; onVerify: (token: string) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const cbName = useRef(`${CALLBACK_PREFIX}${Math.random().toString(36).slice(2)}`);
-
-  useEffect(() => {
-    // Register global callback
-    (window as any)[cbName.current] = onVerify;
-
-    const renderWidget = () => {
-      const win = window as any;
-      if (!containerRef.current || !win.turnstile) return;
-      if (widgetIdRef.current !== null) return; // already rendered
-
-      widgetIdRef.current = win.turnstile.render(containerRef.current, {
-        sitekey: siteKey,
-        theme: 'dark',
-        callback: cbName.current,
-        'expired-callback': () => onVerify(''),
-        'error-callback': () => onVerify(''),
-      });
-    };
-
-    // Script might already be loaded
-    if ((window as any).turnstile) {
-      renderWidget();
-    } else if (!document.getElementById('cf-turnstile-script')) {
-      const script = document.createElement('script');
-      script.id = 'cf-turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.defer = true;
-      script.onload = renderWidget;
-      document.head.appendChild(script);
-    } else {
-      // Script tag exists but not yet loaded — poll
-      const timer = setInterval(() => {
-        if ((window as any).turnstile) { clearInterval(timer); renderWidget(); }
-      }, 200);
-      return () => clearInterval(timer);
-    }
-
-    return () => {
-      delete (window as any)[cbName.current];
-      const win = window as any;
-      if (win.turnstile && widgetIdRef.current !== null) {
-        try { win.turnstile.remove(widgetIdRef.current); } catch { /* */ }
-        widgetIdRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteKey]);
-
-  return <div ref={containerRef} />;
-}
-
 export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -77,26 +15,19 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [loginToken, setLoginToken] = useState('');
-  const [registerToken, setRegisterToken] = useState('');
   const { signIn, signUp } = useAuth();
   const router = useRouter();
-
-  const TURNSTILE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const captchaEnabled = !!TURNSTILE_KEY;
 
   // Reset tokens when switching mode
   const handleModeSwitch = (newMode: AuthMode) => {
     setMode(newMode);
     setEmail(''); setPassword(''); setConfirmPassword(''); setFullName('');
-    setLoginToken(''); setRegisterToken('');
   };
 
   // ── VALIDATION ────────────────────────────────────────────────────
   const loginReady =
     email.trim().length > 0 &&
     password.length >= 1 &&
-    (!captchaEnabled || loginToken.length > 0) &&
     !loading;
 
   const registerReady =
@@ -104,20 +35,17 @@ export default function LoginPage() {
     email.trim().length > 0 &&
     password.length >= 6 &&
     confirmPassword === password &&
-    (!captchaEnabled || registerToken.length > 0) &&
     !loading;
 
   // ── HANDLERS ─────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { toast.error('Isi email dan password!'); return; }
-    if (captchaEnabled && !loginToken) { toast.error('Selesaikan verifikasi CAPTCHA!'); return; }
     setLoading(true);
     try {
       const { error } = await signIn(email, password);
       if (error) {
         toast.error('Email atau password salah!');
-        setLoginToken(''); // reset captcha on fail
       } else {
         toast.success('Selamat datang! ✨');
         router.push((router.query.redirect as string) || '/');
@@ -131,7 +59,7 @@ export default function LoginPage() {
     if (!email || !password) { toast.error('Isi email dan password!'); return; }
     if (password.length < 6) { toast.error('Password minimal 6 karakter!'); return; }
     if (password !== confirmPassword) { toast.error('Password tidak cocok!'); return; }
-    if (captchaEnabled && !registerToken) { toast.error('Selesaikan verifikasi CAPTCHA!'); return; }
+    
     setLoading(true);
     try {
       const { error } = await signUp(email, password, fullName.trim());
@@ -141,7 +69,6 @@ export default function LoginPage() {
         } else {
           toast.error(error.message || 'Gagal mendaftar!');
         }
-        setRegisterToken('');
       } else {
         toast.success('Akun berhasil dibuat! 🎉 Cek email untuk verifikasi.');
         handleModeSwitch('login');
@@ -220,13 +147,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {captchaEnabled && TURNSTILE_KEY && (
-                  <div className="flex flex-col items-center">
-                    <TurnstileWidget siteKey={TURNSTILE_KEY} onVerify={setLoginToken} />
-                    {!loginToken && <p className="text-cream/30 text-[10px] text-center mt-1">🛡️ Verifikasi keamanan diperlukan</p>}
-                  </div>
-                )}
-
                 <button
                   type="submit" disabled={!loginReady}
                   className="w-full btn-gold py-3 text-sm mt-2 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
@@ -241,14 +161,14 @@ export default function LoginPage() {
 
             {/* ── REGISTER FORM ──────────────────────── */}
             {mode === 'register' && (
-              <form onSubmit={handleRegister} className="space-y-4 animate-fade-in">
+              <form onSubmit={handleRegister} className="space-y-4 animate-fade-in" autoComplete="off">
                 <div>
                   <label className="section-label text-[10px] block mb-2">Nama Lengkap</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/30 text-sm">👤</span>
                     <input
                       type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-                      placeholder="Muhammad Fulan" required autoComplete="name"
+                      placeholder="Muhammad Fulan" required autoComplete="off" data-lpignore="true"
                       className="admin-input pl-9"
                     />
                   </div>
@@ -259,7 +179,7 @@ export default function LoginPage() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/30 text-sm">📧</span>
                     <input
                       type="email" value={email} onChange={e => setEmail(e.target.value)}
-                      placeholder="email@contoh.com" required autoComplete="email"
+                      placeholder="email@contoh.com" required autoComplete="new-password" data-lpignore="true"
                       className="admin-input pl-9"
                     />
                   </div>
@@ -271,7 +191,7 @@ export default function LoginPage() {
                     <input
                       type="password" value={password} onChange={e => setPassword(e.target.value)}
                       placeholder="Minimal 6 karakter" required minLength={6}
-                      autoComplete="new-password" className="admin-input pl-9"
+                      autoComplete="new-password" data-lpignore="true" className="admin-input pl-9"
                     />
                   </div>
                   {/* Inline password strength hint */}
@@ -293,7 +213,7 @@ export default function LoginPage() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-cream/30 text-sm">🔒</span>
                     <input
                       type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Ulangi password" required autoComplete="new-password"
+                      placeholder="Ulangi password" required autoComplete="new-password" data-lpignore="true"
                       className="admin-input pl-9"
                     />
                   </div>
@@ -308,13 +228,6 @@ export default function LoginPage() {
                     </p>
                   )}
                 </div>
-
-                {captchaEnabled && TURNSTILE_KEY && (
-                  <div className="flex flex-col items-center">
-                    <TurnstileWidget siteKey={TURNSTILE_KEY} onVerify={setRegisterToken} />
-                    {!registerToken && <p className="text-cream/30 text-[10px] text-center mt-1">🛡️ Verifikasi keamanan diperlukan</p>}
-                  </div>
-                )}
 
                 <button
                   type="submit" disabled={!registerReady}
@@ -333,7 +246,6 @@ export default function LoginPage() {
                      !email ? 'Isi email' :
                      password.length < 6 ? 'Password minimal 6 karakter' :
                      confirmPassword !== password ? 'Konfirmasi password harus sama' :
-                     captchaEnabled && !registerToken ? 'Selesaikan verifikasi CAPTCHA' :
                      'Lengkapi semua field'}
                   </p>
                 )}
