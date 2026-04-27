@@ -2350,7 +2350,7 @@ function EasterEggPhotosTab() {
     try {
       const ext = file.name.split('.').pop();
       const path = `easter-egg/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const url = await uploadPhoto(file, path);
+      const url = await uploadImage(file, path);
       const nextOrder = photos.length > 0 ? Math.max(...photos.map(p => p.order_num)) + 1 : 1;
       await supabase.from('easter_egg_photos').insert({ url, caption: caption.trim(), order_num: nextOrder });
       toast.success('Foto berhasil ditambahkan! 🥚');

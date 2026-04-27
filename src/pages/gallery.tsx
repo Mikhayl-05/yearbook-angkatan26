@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Navbar from '@/components/layout/Navbar';
 import { useAuth } from '@/context/AuthContext';
-import { supabase, uploadPhoto } from '@/lib/supabase';
+import { supabase, uploadImage } from '@/lib/supabase';
 import type { GalleryItem } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { useInView } from 'react-intersection-observer';
@@ -85,7 +85,7 @@ export default function GalleryPage() {
     try {
       const ext = uploadFile.name.split('.').pop();
       const path = `gallery/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const url = await uploadPhoto(uploadFile, path);
+      const url = await uploadImage(uploadFile, path);
 
       if (isAdmin) {
         // Admin uploads go directly to gallery
