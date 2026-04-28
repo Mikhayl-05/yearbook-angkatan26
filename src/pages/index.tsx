@@ -28,6 +28,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
   const [splashOut, setSplashOut] = useState(false);
   const [heroVisible, setHeroVisible] = useState(false);
   const [neutrinoBg, setNeutrinoBg] = useState('');
+  const [bgLoaded, setBgLoaded] = useState(false);
   const [neutrinoCount, setNeutrinoCount] = useState(29);
   const { play, isReady } = useMusic();
 
@@ -38,7 +39,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
 
   useEffect(() => {
     const seen = sessionStorage.getItem('splash_seen');
-    if (seen) { setSplashDone(true); }
+    if (seen) { setSplashDone(true); setBgLoaded(true); }
     const t = setTimeout(() => setMounted(true), 80);
     return () => clearTimeout(t);
   }, []);
@@ -65,15 +66,31 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
       try {
         const { data } = await supabase.from('site_settings').select('*');
         if (data) {
+          let bgUrl = '';
           data.forEach((s: { key: string; value: string }) => {
-            if (s.key === 'neutrino_bg_url' && s.value) setNeutrinoBg(s.value);
+            if (s.key === 'neutrino_bg_url' && s.value) {
+              bgUrl = s.value;
+              setNeutrinoBg(s.value);
+            }
           });
+          if (bgUrl) {
+            const img = new Image();
+            img.src = bgUrl;
+            img.onload = () => setBgLoaded(true);
+            img.onerror = () => setBgLoaded(true);
+          } else {
+            setBgLoaded(true);
+          }
+        } else {
+          setBgLoaded(true);
         }
         const { count: c1 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'neutrino');
         if (c1 !== null) setNeutrinoCount(c1);
-      } catch { /* */ }
+      } catch { setBgLoaded(true); }
     })();
   }, []);
+
+  const isFullyReady = isReady && bgLoaded;
 
   return (
     <>
@@ -103,7 +120,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
           <div className={`relative z-10 text-center px-6 flex flex-col items-center transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex flex-col items-center justify-center mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)]"
               style={{ background: 'rgba(28,16,4,0.9)' }}>
-              <span className="text-gold font-heading font-bold text-2xl leading-none">26</span>
+              <span className="text-gold font-heading font-bold text-2xl leading-none">16</span>
               <span className="text-gold/50 font-heading text-[9px] tracking-widest">XVI</span>
             </div>
             <div className="section-label text-[10px] text-gold/60 mb-3 tracking-[0.5em]">MTs Wahdah Islamiyah · Bone Bolango</div>
@@ -116,13 +133,13 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
             </div>
             <p className="text-cream/40 font-body text-xs mb-10">2023 – 2026</p>
             <button
-              onClick={() => isReady && handleSplashEnter(true)}
-              disabled={!isReady}
+              onClick={() => isFullyReady && handleSplashEnter(true)}
+              disabled={!isFullyReady}
               className={`text-xs tracking-widest px-8 py-3 transition-all ${
-                isReady ? 'btn-gold hover:scale-105 hover:shadow-[0_0_30px_rgba(201,162,39,0.5)]' : 'card-dark text-cream/40 cursor-wait border border-gold/20'
+                isFullyReady ? 'btn-gold hover:scale-105 hover:shadow-[0_0_30px_rgba(201,162,39,0.5)]' : 'card-dark text-cream/40 cursor-wait border border-gold/20'
               }`}
             >
-              {isReady ? 'Masuk →' : 'Memuat...'}
+              {isFullyReady ? 'Masuk →' : 'Memuat...'}
             </button>
           </div>
         </div>
@@ -149,9 +166,9 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
               backgroundImage: neutrinoBg
                 ? `url('${neutrinoBg}')`
                 : `linear-gradient(135deg, #0c0a09 0%, #1a1306 50%, #0c0a09 100%)`,
-              transform: heroVisible ? 'scale(1)' : 'scale(1.08)',
-              transition: 'transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-              opacity: neutrinoBg ? 0.45 : 1,
+              transform: heroVisible ? 'scale(1)' : 'scale(1.15)',
+              transition: 'all 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              opacity: heroVisible ? (neutrinoBg ? 0.45 : 1) : 0,
             }}
           />
           {/* Overlay layers */}
