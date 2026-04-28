@@ -65,18 +65,6 @@ export default function GalleryDetailPage() {
     <div className="min-h-screen dark-paper protected-content" onContextMenu={e => e.preventDefault()}>
       <Navbar />
 
-      {/* BACK BUTTON */}
-      <div className="fixed top-20 left-4 md:left-8 z-40">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-charcoal-dark/80 border border-gold/20 backdrop-blur-md text-cream/70 hover:text-gold hover:border-gold/50 transition-all text-xs font-heading tracking-wider"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Kembali
-        </button>
-      </div>
 
       <div className="pt-24 md:pt-28 pb-16 px-4">
         <div className="max-w-6xl mx-auto">
