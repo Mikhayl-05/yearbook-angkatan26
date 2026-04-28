@@ -51,14 +51,15 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
     setTimeout(() => {
       setSplashDone(true);
       sessionStorage.setItem('splash_seen', '1');
-      // Staggered hero reveal
-      setTimeout(() => setHeroVisible(true), 100);
     }, 700);
   }, [play]);
 
-  // If splash already seen, hero visible immediately
+  // Ensure animations play smoothly even if splash was already seen
   useEffect(() => {
-    if (splashDone) setHeroVisible(true);
+    if (splashDone) {
+      const t = setTimeout(() => setHeroVisible(true), 150);
+      return () => clearTimeout(t);
+    }
   }, [splashDone]);
 
   useEffect(() => {
