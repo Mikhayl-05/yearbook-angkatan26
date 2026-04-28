@@ -81,6 +81,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ data });
       }
+      if (resource === 'playlist') {
+        const { id, updates } = req.body;
+        if (!id) return res.status(400).json({ error: 'id wajib diisi' });
+        const { data, error } = await adminClient.from('playlist').update(updates).eq('id', id).select().single();
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ data });
+      }
       return res.status(400).json({ error: 'resource PATCH tidak didukung' });
     }
 
