@@ -158,7 +158,7 @@ function DashboardTab({ stats, setTab }: { stats: any; setTab: (t: AdminTab) => 
       <p className="text-cream/40 text-sm font-body mb-8">Selamat datang di panel admin Yearbook Angkatan 26</p>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Total Santri', value: stats.santri || 39, icon: '👥', color: '#C9A227' },
+          { label: 'Total Santri', value: stats.santri || 29, icon: '👥', color: '#C9A227' },
           { label: 'Foto Gallery', value: stats.photos, icon: '📸', color: '#F0C040' },
           { label: 'Pesan', value: stats.notes, icon: '📌', color: '#E8C5A0' },
           { label: 'Pending', value: stats.pending, icon: '📤', color: stats.pending > 0 ? '#fbbf24' : '#6BAF92' },
