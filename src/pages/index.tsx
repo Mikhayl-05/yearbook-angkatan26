@@ -326,6 +326,7 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
               {[
                 { href: '/gallery', icon: '📸', label: 'Gallery' },
+                { href: '/drive', icon: '📁', label: 'Drive' },
                 { href: '/timeline', icon: '📅', label: 'Timeline' },
                 { href: '/quotes', icon: '📌', label: 'Quotes Wall' },
               ].map((item, i) => (

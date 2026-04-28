@@ -3,12 +3,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { supabase, uploadPhoto, uploadImage, deleteFileFromStorage } from '@/lib/supabase';
-import type { SantriDB, GalleryItem, GallerySubmission, GuruDB, CustomLink, TimelineItem } from '@/lib/supabase';
+import type { SantriDB, GalleryItem, GallerySubmission, GuruDB, CustomLink, TimelineItem, DriveFolder } from '@/lib/supabase';
+import { DRIVE_COLOR_PRESETS } from '@/pages/drive';
 import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import { LINK_GRADIENT_PRESETS } from '@/components/sections/StudentCard';
 
-type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users' | 'eggphotos';
+type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users' | 'eggphotos' | 'drive';
 
 const getAccessToken = async (): Promise<string> => {
   const { data } = await supabase.auth.getSession();
@@ -17,7 +18,10 @@ const getAccessToken = async (): Promise<string> => {
 
 const callAdminContent = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body: Record<string, any>) => {
   const token = await getAccessToken();
-  const res = await fetch('/api/admin/content', {
+  const url = method === 'GET' && body?.resource
+    ? `/api/admin/content?resource=${encodeURIComponent(body.resource)}`
+    : '/api/admin/content';
+  const res = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: method === 'GET' ? undefined : JSON.stringify(body),
@@ -90,6 +94,7 @@ export default function AdminDashboard() {
     { id: 'submissions', label: 'Pending',      icon: '📤', badge: stats.pending },
     { id: 'notes',       label: 'Quote Wall',   icon: '📌' },
     { id: 'playlist',    label: 'Playlist',     icon: '🎵' },
+    { id: 'drive',       label: 'Drive',        icon: '📁' },
     ...(isRoot ? [{ id: 'timeline' as const, label: 'Timeline', icon: '📅' }] : []),
     ...(isRoot ? [{ id: 'settings' as const, label: 'Pengaturan', icon: '⚙️' }] : []),
     ...(isRoot ? [{ id: 'eggphotos' as const, label: 'Easter Egg', icon: '🥚' }] : []),
@@ -140,6 +145,7 @@ export default function AdminDashboard() {
           {tab === 'submissions' && <SubmissionsTab onUpdate={fetchStats} scopeKelas={scopeKelas} />}
           {tab === 'notes'       && <NotesTab scopeKelas={scopeKelas} />}
           {tab === 'playlist'    && <PlaylistTab scopeKelas={scopeKelas} />}
+          {tab === 'drive'       && <DriveTab scopeKelas={scopeKelas} />}
           {tab === 'timeline'    && isRoot && <TimelineTab />}
           {tab === 'settings'    && isRoot && <SettingsTab />}
           {tab === 'eggphotos'  && isRoot && <EasterEggPhotosTab />}
@@ -2467,6 +2473,347 @@ function EasterEggPhotosTab() {
 ALTER TABLE easter_egg_photos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read" ON easter_egg_photos FOR SELECT USING (true);
 CREATE POLICY "Admin write" ON easter_egg_photos FOR ALL USING (auth.role() = 'authenticated');`}</pre>
+      </div>
+    </div>
+  );
+}
+
+// ── DRIVE TAB ──────────────────────────────────────────────────
+function DriveTab({ scopeKelas }: { scopeKelas: string | null }) {
+  const [folders, setFolders] = useState<DriveFolder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editModal, setEditModal] = useState<DriveFolder | null>(null);
+
+  useEffect(() => { fetchFolders(); }, []);
+
+  const fetchFolders = async (background = false) => {
+    if (!background) setLoading(true);
+    try {
+      const result = await callAdminContent('GET', { resource: 'drive_folder' });
+      if (result?.data) setFolders(result.data as DriveFolder[]);
+    } catch { /* */ }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Hapus folder "${title}"?`)) return;
+    try {
+      await callAdminContent('DELETE', { resource: 'drive_folder', id });
+      setFolders(f => f.filter(x => x.id !== id));
+      toast.success('Folder dihapus');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal menghapus');
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-cream text-xl font-bold">Drive Folders</h2>
+          <p className="text-cream/40 text-xs font-body mt-0.5">{folders.length} folder &middot; Tampil di halaman /drive</p>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="admin-btn admin-btn-primary text-xs btn-press-active">
+          + Tambah Folder
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-40 rounded-2xl" />)}
+        </div>
+      ) : folders.length === 0 ? (
+        <div className="text-center py-16 text-cream/30">
+          <div className="text-4xl mb-3">&#128193;</div>
+          <p className="font-display text-lg mb-1">Belum ada folder</p>
+          <p className="text-xs font-body">Klik &quot;+ Tambah Folder&quot; untuk menambahkan.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {folders.map(folder => {
+            const preset = DRIVE_COLOR_PRESETS[folder.color] || DRIVE_COLOR_PRESETS['gold'];
+            return (
+              <div
+                key={folder.id}
+                className="relative group rounded-2xl overflow-hidden border transition-all duration-200"
+                style={{ background: preset.bg, border: `1px solid ${preset.border}40` }}
+              >
+                <div className="p-4 flex flex-col items-center text-center gap-2 min-h-[140px] justify-center">
+                  <svg className="w-10 h-10" viewBox="0 0 24 24" fill={preset.icon}>
+                    <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                  </svg>
+                  <div>
+                    <p className="font-heading font-bold text-xs leading-snug line-clamp-2" style={{ color: preset.text }}>
+                      {folder.title}
+                    </p>
+                    {folder.description && (
+                      <p className="text-cream/40 text-[10px] mt-0.5 line-clamp-1">{folder.description}</p>
+                    )}
+                  </div>
+                  <span className="text-cream/20 text-[9px] font-heading tracking-wider">{preset.label}</span>
+                </div>
+                <div className="absolute inset-0 bg-charcoal-dark/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
+                  <button onClick={() => setEditModal(folder)} className="admin-btn admin-btn-ghost text-xs btn-press-active">
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(folder.id, folder.title)} className="admin-btn admin-btn-danger text-xs btn-press-active">
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showAdd && (
+        <DriveFolderModal
+          scopeKelas={scopeKelas}
+          onClose={() => setShowAdd(false)}
+          onSave={() => { setShowAdd(false); fetchFolders(true); }}
+        />
+      )}
+      {editModal && (
+        <DriveFolderModal
+          scopeKelas={scopeKelas}
+          folder={editModal}
+          onClose={() => setEditModal(null)}
+          onSave={() => { setEditModal(null); fetchFolders(true); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── DRIVE FOLDER MODAL (Add / Edit) ────────────────────────────
+function DriveFolderModal({
+  scopeKelas,
+  folder,
+  onClose,
+  onSave,
+}: {
+  scopeKelas: string | null;
+  folder?: DriveFolder;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const isEdit = !!folder;
+  const [form, setForm] = useState({
+    title: folder?.title || '',
+    description: folder?.description || '',
+    drive_url: folder?.drive_url || '',
+    color: folder?.color || 'gold',
+    kelas: folder?.kelas || scopeKelas || 'all',
+    order_num: folder?.order_num ?? 0,
+  });
+  const [saving, setSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleClose = (shouldRefresh = false) => {
+    setIsClosing(true);
+    setTimeout(() => { if (shouldRefresh) onSave(); else onClose(); }, 300);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { toast.error('Judul wajib diisi!'); return; }
+    if (!form.drive_url.trim()) { toast.error('URL Google Drive wajib diisi!'); return; }
+    setSaving(true);
+    try {
+      if (isEdit) {
+        await callAdminContent('PATCH', { resource: 'drive_folder', id: folder!.id, updates: form });
+        toast.success('Folder diperbarui!');
+      } else {
+        await callAdminContent('POST', { resource: 'drive_folder', data: form });
+        toast.success('Folder ditambahkan!');
+      }
+      handleClose(true);
+    } catch (err: any) {
+      toast.error('Gagal: ' + (err?.message || ''));
+    }
+    setSaving(false);
+  };
+
+  const selectedPreset = DRIVE_COLOR_PRESETS[form.color] || DRIVE_COLOR_PRESETS['gold'];
+
+  return (
+    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
+      <div
+        className={`absolute inset-0 bg-black/80 backdrop-blur-sm ${isClosing ? 'animate-fade-out-fast' : 'animate-fade-in-fast'}`}
+        onClick={() => handleClose()}
+      />
+      <div className={`relative w-full max-w-2xl bg-[#1a1a1a] border border-gold/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${isClosing ? 'animate-premium-exit' : 'animate-premium-zoom'}`}>
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+          <div>
+            <h3 className="font-display text-cream text-base font-bold">
+              {isEdit ? `Edit: ${folder!.title}` : 'Tambah Folder Drive'}
+            </h3>
+            <p className="text-[7px] text-gold/60 uppercase tracking-[0.3em] font-heading mt-0.5">Manajemen Drive</p>
+          </div>
+          <button
+            onClick={() => handleClose()}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-cream/30 hover:text-white hover:bg-red-500/20 transition-all"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            {/* LEFT — Form */}
+            <div className="space-y-4">
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Judul Folder *</label>
+                <input
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="Rihlah Pantai"
+                  className="admin-input text-xs py-2"
+                />
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Deskripsi (opsional)</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Dokumentasi kegiatan..."
+                  rows={2}
+                  className="admin-input text-xs py-2 resize-none"
+                />
+              </div>
+              <div>
+                <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">URL Google Drive *</label>
+                <input
+                  value={form.drive_url}
+                  onChange={e => setForm(f => ({ ...f, drive_url: e.target.value }))}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  className="admin-input text-xs py-2"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Urutan</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.order_num}
+                    onChange={e => setForm(f => ({ ...f, order_num: parseInt(e.target.value) || 0 }))}
+                    className="admin-input text-xs py-2"
+                  />
+                </div>
+                {!scopeKelas && (
+                  <div>
+                    <label className="section-label text-[8px] block mb-1.5 uppercase tracking-[0.2em] font-bold">Kelas</label>
+                    <select
+                      value={form.kelas}
+                      onChange={e => setForm(f => ({ ...f, kelas: e.target.value }))}
+                      className="admin-select text-xs py-2"
+                    >
+                      <option value="all">Semua</option>
+                      <option value="neutrino">Neutrino</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Live Preview */}
+              <div>
+                <label className="section-label text-[8px] block mb-2 uppercase tracking-[0.2em] font-bold">Preview Card</label>
+                <div
+                  className="rounded-2xl p-5 flex flex-col items-center text-center gap-2 border transition-all duration-300"
+                  style={{
+                    background: selectedPreset.bg,
+                    border: `1px solid ${selectedPreset.border}50`,
+                    boxShadow: `0 0 20px ${selectedPreset.glow}`,
+                  }}
+                >
+                  <svg className="w-12 h-12" viewBox="0 0 24 24" fill={selectedPreset.icon}>
+                    <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                  </svg>
+                  <p className="font-heading font-bold text-xs" style={{ color: selectedPreset.text }}>
+                    {form.title || 'Judul Folder'}
+                  </p>
+                  {form.description && (
+                    <p className="text-cream/40 text-[10px] line-clamp-1">{form.description}</p>
+                  )}
+                  <span className="text-cream/20 text-[9px] font-heading tracking-wider">{selectedPreset.label}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT — Color Picker */}
+            <div>
+              <label className="section-label text-[8px] block mb-2 uppercase tracking-[0.2em] font-bold">
+                Warna Card ({Object.keys(DRIVE_COLOR_PRESETS).length} pilihan)
+              </label>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(DRIVE_COLOR_PRESETS).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    onClick={() => setForm(f => ({ ...f, color: key }))}
+                    title={preset.label}
+                    className={`relative flex flex-col items-center p-1.5 rounded-xl border-2 transition-all duration-150 ${
+                      form.color === key
+                        ? 'border-white/70 scale-105'
+                        : 'border-transparent hover:border-white/30 hover:scale-105'
+                    }`}
+                    style={{ background: preset.bg }}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full border-2"
+                      style={{
+                        background: preset.icon,
+                        borderColor: preset.border,
+                        boxShadow: form.color === key ? `0 0 8px ${preset.glow}` : 'none',
+                      }}
+                    />
+                    {form.color === key && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-white flex items-center justify-center">
+                        <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="text-cream/30 text-[10px] font-body mt-3 text-center">
+                Dipilih: {selectedPreset.label}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-5 pt-3 border-t border-white/5 bg-[#1a1a1a]/80 backdrop-blur-md">
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleClose()}
+              className="flex-1 py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest text-cream/40 hover:text-cream bg-white/5 border border-white/5 transition-all"
+            >
+              BATAL
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-[1.5] py-2.5 rounded-xl text-[9px] font-bold font-heading tracking-widest bg-gradient-to-r from-gold-dark to-gold text-charcoal-dark shadow-lg shadow-gold/20 transition-all disabled:opacity-50"
+            >
+              {saving ? 'SAVING...' : isEdit ? 'SIMPAN PERUBAHAN' : 'TAMBAH FOLDER'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

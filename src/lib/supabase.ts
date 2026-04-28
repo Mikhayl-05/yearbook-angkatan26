@@ -334,6 +334,34 @@ export const deleteTimelineItem = async (id: string) => {
   return supabase.from('timeline').delete().eq('id', id);
 };
 
+// ─── DRIVE FOLDERS ────────────────────────────────────────────
+export type DriveFolder = {
+  id: string;
+  title: string;
+  description?: string;
+  drive_url: string;
+  color: string;
+  kelas: string;
+  order_num: number;
+  created_at: string;
+};
+
+export const getDriveFolders = async () => {
+  return supabase.from('drive_folders').select('*').order('order_num', { ascending: true });
+};
+
+export const addDriveFolder = async (folder: Omit<DriveFolder, 'id' | 'created_at'>) => {
+  return supabase.from('drive_folders').insert(folder).select().single();
+};
+
+export const updateDriveFolder = async (id: string, updates: Partial<Omit<DriveFolder, 'id' | 'created_at'>>) => {
+  return supabase.from('drive_folders').update(updates).eq('id', id);
+};
+
+export const deleteDriveFolder = async (id: string) => {
+  return supabase.from('drive_folders').delete().eq('id', id);
+};
+
 // ─── STORAGE DELETE HELPER ───────────────────────────────────
 export const deleteFileFromStorage = async (url: string) => {
   try {

@@ -9,6 +9,7 @@ const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/kelas/neutrino', label: 'Neutrino' },
   { href: '/gallery', label: 'Gallery' },
+  { href: '/drive', label: 'Drive' },
   { href: '/timeline', label: 'Timeline' },
   { href: '/quotes', label: 'Quotes Wall' },
 ];

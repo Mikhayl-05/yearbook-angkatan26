@@ -27,6 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ data });
       }
+      if (resource === 'drive_folder') {
+        let q = adminClient.from('drive_folders').select('*').order('order_num', { ascending: true });
+        const { data, error } = await q;
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ data });
+      }
       return res.status(400).json({ error: 'resource GET tidak didukung' });
     }
 
@@ -49,6 +55,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const payload = { ...req.body.data };
         payload.kelas = pickAllowedKelas(kelasScope, payload.kelas || 'all');
         const { data, error } = await adminClient.from('playlist').insert(payload).select().single();
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ data });
+      }
+      if (resource === 'drive_folder') {
+        const payload = { ...req.body.data };
+        const { data, error } = await adminClient.from('drive_folders').insert(payload).select().single();
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ data });
       }
@@ -88,6 +100,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ data });
       }
+      if (resource === 'drive_folder') {
+        const { id, updates } = req.body;
+        if (!id) return res.status(400).json({ error: 'id wajib diisi' });
+        const { data, error } = await adminClient.from('drive_folders').update(updates).eq('id', id).select().single();
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ data });
+      }
       return res.status(400).json({ error: 'resource PATCH tidak didukung' });
     }
 
@@ -113,6 +132,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (resource === 'playlist') {
         const { id } = req.body;
         const { error } = await adminClient.from('playlist').delete().eq('id', id);
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(200).json({ success: true });
+      }
+      if (resource === 'drive_folder') {
+        const { id } = req.body;
+        const { error } = await adminClient.from('drive_folders').delete().eq('id', id);
         if (error) return res.status(500).json({ error: error.message });
         return res.status(200).json({ success: true });
       }
