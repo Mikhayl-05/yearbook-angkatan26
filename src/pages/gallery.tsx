@@ -1,5 +1,6 @@
 // src/pages/gallery.tsx
-import { useState, useEffect } from 'react';
+// Optimized: Infinite scroll pagination (24 per page) — menggantikan fetch semua sekaligus
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Navbar from '@/components/layout/Navbar';
@@ -7,7 +8,6 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase, uploadImage } from '@/lib/supabase';
 import type { GalleryItem } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { useInView } from 'react-intersection-observer';
 
 type Category = 'all' | 'momen' | 'rihlah' | 'wisuda' | 'keseharian' | 'neutrino';
 
@@ -20,13 +20,19 @@ const CATEGORY_LABELS: Record<Category, string> = {
   keseharian: '☀️ Keseharian',
 };
 
+const PAGE_SIZE = 24; // Maksimal 24 foto per page — aman di HP low-end
+
 export default function GalleryPage() {
   const { user, isAdmin, userName } = useAuth();
   const router = useRouter();
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -37,26 +43,72 @@ export default function GalleryPage() {
   const [uploadKelas, setUploadKelas] = useState('all');
   const [uploading, setUploading] = useState(false);
 
-  const { ref: gridRef, inView: gridInView } = useInView({ triggerOnce: true, threshold: 0.05 });
+  // ── Fetch page dengan pagination ─────────────────────────────────
+  const fetchGallery = useCallback(async (pageNum: number, category: Category, reset = false) => {
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
 
-  useEffect(() => { fetchGallery(); }, []);
+    try {
+      let query = supabase
+        .from('gallery')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
-  const fetchGallery = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('gallery').select('*').order('created_at', { ascending: false });
-    if (data) setGallery(data.filter((g: GalleryItem) => g.url) as GalleryItem[]);
-    setLoading(false);
-  };
+      if (category !== 'all') {
+        query = query.or(`category.eq.${category},kelas.eq.${category}`);
+      }
 
-  const filtered = gallery.filter(item =>
-    activeCategory === 'all' || item.category === activeCategory || item.kelas === activeCategory
-  );
+      const { data } = await query;
+      const filtered = (data ?? []).filter((g: GalleryItem) => g.url);
+
+      if (reset || pageNum === 0) {
+        setGallery(filtered);
+      } else {
+        setGallery(prev => [...prev, ...filtered]);
+      }
+
+      setHasMore(filtered.length === PAGE_SIZE);
+    } catch {
+      toast.error('Gagal memuat gallery');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, []);
+
+  // Load pertama kali / saat kategori berubah
+  useEffect(() => {
+    setPage(0);
+    setGallery([]);
+    setHasMore(true);
+    fetchGallery(0, activeCategory, true);
+  }, [activeCategory, fetchGallery]);
+
+  // ── IntersectionObserver untuk Infinite Scroll ───────────────────
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchGallery(nextPage, activeCategory);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, page, activeCategory, fetchGallery]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // ── Security: validate file type & size ──────────────────
     const MAX_SIZE_MB = 5;
     const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     const ALLOWED_EXTS = /\.(jpg|jpeg|png|webp|gif)$/i;
@@ -88,16 +140,16 @@ export default function GalleryPage() {
       const url = await uploadImage(uploadFile, path);
 
       if (isAdmin) {
-        // Admin uploads go directly to gallery
         await supabase.from('gallery').insert({
           url, caption: uploadCaption.trim(), article_text: uploadArticle.trim() || null,
           category: uploadCategory, kelas: uploadKelas,
           submitted_name: 'Admin', submitted_by: user?.id,
         });
         toast.success('Foto berhasil diupload! 📸');
-        fetchGallery();
+        setPage(0);
+        setGallery([]);
+        fetchGallery(0, activeCategory, true);
       } else {
-        // Regular user submissions go to pending
         await supabase.from('gallery_submissions').insert({
           url, caption: uploadCaption.trim(), article_text: uploadArticle.trim() || null,
           category: uploadCategory, kelas: uploadKelas,
@@ -106,10 +158,9 @@ export default function GalleryPage() {
         });
         toast.success('Foto dikirim! Menunggu persetujuan admin 📤');
       }
-      // Reset form
       setUploadFile(null); setUploadPreview(''); setUploadCaption('');
       setUploadArticle(''); setShowUpload(false);
-    } catch (err) {
+    } catch {
       toast.error('Gagal upload. Coba lagi!');
     }
     setUploading(false);
@@ -182,7 +233,6 @@ export default function GalleryPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Photo preview */}
               {uploadPreview ? (
                 <div className="relative rounded-xl overflow-hidden border border-gold/20">
                   <img src={uploadPreview} alt="Preview" className="w-full max-h-64 object-cover" />
@@ -246,16 +296,40 @@ export default function GalleryPage() {
       <div className="max-w-7xl mx-auto px-4 py-10">
         {loading ? (
           <div className="masonry-gallery">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton rounded-lg mb-3" style={{ height: `${200 + (i % 3) * 80}px` }} />
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="skeleton rounded-lg mb-3" style={{ height: `${180 + (i % 3) * 70}px` }} />
             ))}
           </div>
-        ) : filtered.length > 0 ? (
-          <div ref={gridRef} className={`masonry-gallery scroll-reveal-stagger ${gridInView ? 'revealed' : ''}`}>
-            {filtered.map((item) => (
-              <GalleryCard key={item.id} item={item} isAdmin={isAdmin} onDelete={handleDelete} />
-            ))}
-          </div>
+        ) : gallery.length > 0 ? (
+          <>
+            <div className="masonry-gallery">
+              {gallery.map((item) => (
+                <GalleryCard key={item.id} item={item} isAdmin={isAdmin} onDelete={handleDelete} />
+              ))}
+            </div>
+
+            {/* Sentinel untuk Infinite Scroll */}
+            <div ref={sentinelRef} className="h-8" />
+
+            {loadingMore && (
+              <div className="flex justify-center py-6">
+                <div className="flex items-center gap-3 text-cream/40 text-xs font-heading tracking-wider">
+                  <div className="w-4 h-4 border-2 border-gold/40 border-t-gold rounded-full animate-spin" />
+                  Memuat lebih banyak...
+                </div>
+              </div>
+            )}
+
+            {!hasMore && !loadingMore && gallery.length > 0 && (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center gap-3 text-cream/20 text-xs font-heading tracking-widest">
+                  <div className="w-12 h-px bg-gold/20" />
+                  Semua foto sudah ditampilkan ({gallery.length} foto)
+                  <div className="w-12 h-px bg-gold/20" />
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-20 text-cream/30">
             <div className="text-4xl mb-4">📷</div>
@@ -270,7 +344,6 @@ export default function GalleryPage() {
   );
 }
 
-// Gallery card component
 function GalleryCard({ item, isAdmin, onDelete }: { item: GalleryItem; isAdmin: boolean; onDelete: (id: string) => void }) {
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -278,7 +351,6 @@ function GalleryCard({ item, isAdmin, onDelete }: { item: GalleryItem; isAdmin: 
     <div className="break-inside-avoid mb-3 group relative">
       <Link href={`/gallery/${item.id}`}>
         <div className="overflow-hidden rounded-lg border border-gold/10 hover:border-gold/40 transition-all cursor-pointer relative">
-          {/* Skeleton */}
           {!imgLoaded && (
             <div className="skeleton w-full" style={{ height: '250px' }} />
           )}
@@ -287,12 +359,11 @@ function GalleryCard({ item, isAdmin, onDelete }: { item: GalleryItem; isAdmin: 
             alt={item.caption || 'Gallery'}
             className={`w-full object-cover transition-all duration-500 group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
             loading="lazy"
+            decoding="async"
             draggable={false}
             onLoad={() => setImgLoaded(true)}
             onContextMenu={e => e.preventDefault()}
           />
-
-          {/* Caption overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-charcoal-dark/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
             <div>
               <p className="text-cream text-xs font-body font-bold">{item.caption}</p>
@@ -301,15 +372,12 @@ function GalleryCard({ item, isAdmin, onDelete }: { item: GalleryItem; isAdmin: 
               )}
             </div>
           </div>
-
-          {/* Category badge */}
           <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-charcoal-dark/70 text-gold/80 border border-gold/20 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
             {item.category}
           </div>
         </div>
       </Link>
 
-      {/* Admin delete button */}
       {isAdmin && (
         <button
           onClick={e => { e.preventDefault(); e.stopPropagation(); onDelete(item.id); }}

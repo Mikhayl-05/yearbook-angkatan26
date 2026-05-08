@@ -1389,11 +1389,33 @@ function AddMusicModal({ scopeKelas, nextOrder, onClose, onSave }: { scopeKelas:
   };
 
   const handleAdd = async () => {
-    if (!title) { toast.error('Isi judul!'); return; }
-    if (!audioFile) { toast.error('Pilih file audio!'); return; }
+    if (!title) { toast.error('Isi judul lagu!'); return; }
+    if (!audioFile) { toast.error('Pilih file audio dulu!'); return; }
+
+    // ── Validasi file audio ─────────────────────────────────────────
+    const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/flac', 'audio/x-m4a', 'audio/mp4'];
+    const ALLOWED_AUDIO_EXTS = /\.(mp3|wav|ogg|aac|m4a|flac)$/i;
+    const MAX_AUDIO_MB = 20; // Supabase free tier limit
+
+    if (!ALLOWED_AUDIO_TYPES.includes(audioFile.type) && !ALLOWED_AUDIO_EXTS.test(audioFile.name)) {
+      toast.error('Format tidak didukung! Gunakan MP3, WAV, AAC, atau M4A.', { duration: 5000 });
+      return;
+    }
+    const fileSizeMB = audioFile.size / (1024 * 1024);
+    if (fileSizeMB > MAX_AUDIO_MB) {
+      toast.error(
+        `File terlalu besar! ${fileSizeMB.toFixed(1)}MB melebihi batas ${MAX_AUDIO_MB}MB.\n` +
+        `💡 Tips: Kompres dulu di mp3smaller.com atau turunkan bitrate ke 128kbps.`,
+        { duration: 8000 }
+      );
+      return;
+    }
+
     setUploading(true);
     try {
-      const url = await uploadPhoto(audioFile, `playlist/${Date.now()}_${audioFile.name}`);
+      // Sanitize filename — hapus spasi dan karakter aneh
+      const sanitizedName = audioFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const url = await uploadPhoto(audioFile, `playlist/${Date.now()}_${sanitizedName}`);
       await callAdminContent('POST', {
         resource: 'playlist',
         data: {
@@ -1404,9 +1426,16 @@ function AddMusicModal({ scopeKelas, nextOrder, onClose, onSave }: { scopeKelas:
           order_num: nextOrder,
         },
       });
-      toast.success('Lagu ditambahkan!');
+      toast.success(`✅ "${title}" berhasil ditambahkan ke playlist!`);
       handleClose(true);
-    } catch (err: any) { toast.error('Gagal: ' + (err?.message || 'Cek storage bucket')); }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('size') || msg.includes('limit') || msg.includes('too large')) {
+        toast.error(`Upload gagal: file terlalu besar untuk Supabase Storage (batas ${MAX_AUDIO_MB}MB). Kompres dulu ya!`, { duration: 8000 });
+      } else {
+        toast.error('Upload gagal: ' + (msg || 'Pastikan bucket "yearbook" di Supabase sudah diset public.'), { duration: 6000 });
+      }
+    }
     setUploading(false);
   };
 
@@ -1508,49 +1537,78 @@ function EditMusicModal({ track, onClose, onSave }: { track: any; onClose: () =>
 
 // ── SETTINGS TAB ──────────────────────
 function SettingsTab() {
+  const { isRootAdmin } = useAuth();
   const [neutrinoBg, setNeutrinoBg] = useState('');
+  const [neutrinoBgMobile, setNeutrinoBgMobile] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
   const [ogBg, setOgBg] = useState('');
   const [saving, setSaving] = useState<string|null>(null);
 
   useEffect(() => {
     supabase.from('site_settings').select('*').then(({data}) => {
-      if(data) data.forEach((s:{key:string;value:string}) => {
-        if(s.key==='neutrino_bg_url') setNeutrinoBg(s.value||'');
-        if(s.key==='allaxe_bg_url') setAllAxeBg(s.value||'');
-        if(s.key==='og_image_url') setOgBg(s.value||'');
+      if (data) data.forEach((s:{key:string;value:string}) => {
+        if (s.key === 'neutrino_bg_url')        setNeutrinoBg(s.value||'');
+        if (s.key === 'neutrino_bg_mobile_url')  setNeutrinoBgMobile(s.value||'');
+        if (s.key === 'allaxe_bg_url')           setAllAxeBg(s.value||'');
+        if (s.key === 'og_image_url')            setOgBg(s.value||'');
       });
     });
   }, []);
 
+  // Centralized getter/setter to avoid bug-prone if/else chains
+  const getByKey = (key: string) => {
+    if (key === 'neutrino_bg_url')        return neutrinoBg;
+    if (key === 'neutrino_bg_mobile_url')  return neutrinoBgMobile;
+    if (key === 'allaxe_bg_url')          return allAxeBg;
+    if (key === 'og_image_url')           return ogBg;
+    return '';
+  };
+  const setByKey = (key: string, val: string) => {
+    if (key === 'neutrino_bg_url')        setNeutrinoBg(val);
+    if (key === 'neutrino_bg_mobile_url')  setNeutrinoBgMobile(val);
+    if (key === 'allaxe_bg_url')          setAllAxeBg(val);
+    if (key === 'og_image_url')           setOgBg(val);
+  };
+
   const handleUploadBg = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if(!file) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Validasi format gambar
+    const ALLOWED = ['image/jpeg','image/jpg','image/png','image/webp'];
+    if (!ALLOWED.includes(file.type)) { toast.error('Gunakan JPG, PNG, atau WEBP!'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Ukuran max 10MB untuk background!'); return; }
+    // Guard Root Admin untuk mobile bg
+    if (key === 'neutrino_bg_mobile_url' && !isRootAdmin) {
+      toast.error('Hanya Root Admin yang bisa mengubah background mobile!'); return;
+    }
     setSaving(key);
     try {
-      const oldUrl = key === 'neutrino_bg_url' ? neutrinoBg : key === 'allaxe_bg_url' ? allAxeBg : ogBg;
-      const url = await uploadImage(file, `settings/${key}_${Date.now()}.webp`);
+      const oldUrl = getByKey(key);
+      const ext = file.name.split('.').pop() || 'jpg';
+      const url = await uploadImage(file, `settings/${key}_${Date.now()}.${ext}`);
       const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()}, { onConflict: 'key' });
       if (error) throw error;
       if (oldUrl) await deleteFileFromStorage(oldUrl);
-      if(key==='neutrino_bg_url') setNeutrinoBg(url);
-      if(key==='allaxe_bg_url') setAllAxeBg(url);
-      if(key==='og_image_url') setOgBg(url);
-      toast.success('Pengaturan diupdate (WebP optimized)!');
-    } catch (err: any) { toast.error('Gagal: ' + (err?.message || '')); }
+      setByKey(key, url);
+      toast.success('Background berhasil diupdate!');
+    } catch (err: any) { toast.error('Gagal upload: ' + (err?.message || '')); }
     setSaving(null);
   };
 
-  const handleResetBg = async (key: string, oldUrl: string) => {
-    if (!confirm('Reset background ke default? Foto yang diupload akan dihapus dari pengaturan.')) return;
+  const handleResetBg = async (key: string) => {
+    if (!confirm('Reset background ke default? File akan dihapus dari storage.')) return;
+    // Guard Root Admin untuk mobile bg
+    if (key === 'neutrino_bg_mobile_url' && !isRootAdmin) {
+      toast.error('Hanya Root Admin yang bisa mereset background mobile!'); return;
+    }
     setSaving(key + '_reset');
     try {
+      const oldUrl = getByKey(key);
       const { error } = await supabase.from('site_settings').upsert({key, value:'', updated_at:new Date().toISOString()}, { onConflict: 'key' });
       if (error) throw error;
       if (oldUrl) await deleteFileFromStorage(oldUrl);
-      if(key==='neutrino_bg_url') setNeutrinoBg('');
-      if(key==='allaxe_bg_url') setAllAxeBg('');
-      if(key==='og_image_url') setOgBg('');
-      toast.success('Pengaturan direset ke default!');
+      setByKey(key, '');
+      toast.success('Background direset ke default!');
     } catch (err: any) { toast.error('Gagal reset: ' + (err?.message || '')); }
     setSaving(null);
   };
@@ -1560,17 +1618,20 @@ function SettingsTab() {
       <h2 className="font-display text-cream text-xl font-bold mb-2">Pengaturan</h2>
       <p className="text-cream/40 text-xs font-body mb-8">Kelola tampilan halaman utama</p>
       <div className="space-y-6 max-w-lg">
-        {/* Neutrino BG */}
+        {/* Background Neutrino — Desktop */}
         <div className="card-dark p-6">
-          <h3 className="text-cream text-sm font-display font-bold mb-1">Background Neutrino</h3>
-          <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino (halaman beranda). Foto akan ditampilkan dengan opacity rendah + efek fade agar teks tetap terbaca.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">🖥 Desktop</span>
+          </div>
+          <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino (halaman beranda) untuk tampilan Desktop/PC. Ditampilkan dengan opacity rendah agar teks tetap terbaca.</p>
           {neutrinoBg ? (
             <div className="relative mb-3">
               <img src={neutrinoBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
               <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={() => handleResetBg('neutrino_bg_url', neutrinoBg)}
+                  onClick={() => handleResetBg('neutrino_bg_url')}
                   disabled={saving === 'neutrino_bg_url_reset'}
                   className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
                 >
@@ -1585,10 +1646,50 @@ function SettingsTab() {
             </div>
           )}
           <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
-            {saving === 'neutrino_bg_url' ? '⏳ Uploading...' : '📷 Upload Background Neutrino'}
+            {saving === 'neutrino_bg_url' ? '⏳ Uploading...' : '📷 Upload Background Desktop'}
             <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_url', e)} disabled={!!saving} />
           </label>
         </div>
+
+        {/* Background Neutrino — Mobile (Root Admin Only) */}
+        {isRootAdmin && (
+          <div className="card-dark p-6 border border-gold/30">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-orange-500/20 text-orange-300 border border-orange-500/30">📱 Mobile</span>
+              <span className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-gold/20 text-gold border border-gold/40">⚡ Root Admin</span>
+            </div>
+            <p className="text-cream/40 text-xs mb-4">
+              Foto latar khusus tampilan Mobile/HP. Disarankan gunakan foto portrait (rasio 9:16) agar tampil lebih baik di layar kecil.
+              Jika tidak diset, otomatis menggunakan foto Desktop.
+            </p>
+            {neutrinoBgMobile ? (
+              <div className="relative mb-3">
+                <img src={neutrinoBgMobile} className="w-full h-40 object-cover rounded-lg border border-orange-500/30" style={{opacity:0.7, objectPosition:'center top'}} />
+                <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/40 to-charcoal-dark/70 rounded-lg" />
+                <div className="absolute top-2 right-2">
+                  <button
+                    onClick={() => handleResetBg('neutrino_bg_mobile_url')}
+                    disabled={saving === 'neutrino_bg_mobile_url_reset'}
+                    className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
+                  >
+                    🗑 Reset
+                  </button>
+                </div>
+                <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview mobile (portrait)</p>
+              </div>
+            ) : (
+              <div className="h-32 rounded-lg border-2 border-dashed border-orange-500/20 flex flex-col items-center justify-center mb-3 gap-1">
+                <span className="text-2xl">📱</span>
+                <span className="text-cream/30 text-xs">Belum diset — menggunakan foto Desktop</span>
+              </div>
+            )}
+            <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_mobile_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+              {saving === 'neutrino_bg_mobile_url' ? '⏳ Uploading...' : '📱 Upload Background Mobile'}
+              <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_mobile_url', e)} disabled={!!saving} />
+            </label>
+          </div>
+        )}
 
         {/* OG Image Preview */}
         <div className="card-dark p-6">
@@ -1599,7 +1700,7 @@ function SettingsTab() {
               <img src={ogBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" />
               <div className="absolute top-2 right-2">
                 <button
-                  onClick={() => handleResetBg('og_image_url', ogBg)}
+                  onClick={() => handleResetBg('og_image_url')}
                   disabled={saving === 'og_image_url_reset'}
                   className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
                 >

@@ -1,6 +1,7 @@
 // src/pages/index.tsx
 // Fixed: PC hero layout, animations after splash, mobile performance
-import { useEffect, useRef, useState, useCallback } from 'react';
+// Optimized: SSR data fetching (no double client-side fetch), prefers-reduced-motion
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import GoldParticles from '@/components/ui/GoldParticles';
@@ -13,23 +14,51 @@ import Head from 'next/head';
 
 const GRADUATION_DATE = new Date('2026-05-16T08:00:00');
 
+// ── SSR: Ambil SEMUA data sekaligus dengan Promise.all ─────────────────────
+// Sebelumnya: 1 query SSR + 3 query client-side = 4 round trips ke Supabase
+// Sekarang: 3 query PARALLEL di server = 1 network round trip total
 export const getServerSideProps = async () => {
-  let ogImageUrl = null;
   try {
-    const { data } = await supabase.from('site_settings').select('value').eq('key', 'og_image_url').single();
-    if (data?.value) ogImageUrl = data.value;
-  } catch { /* ignore */ }
-  return { props: { ogImageUrl } };
+    const [settingsRes, countRes, ogRes] = await Promise.all([
+      supabase.from('site_settings').select('key, value'),
+      supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'neutrino'),
+      supabase.from('site_settings').select('value').eq('key', 'og_image_url').single(),
+    ]);
+
+    const settings = settingsRes.data ?? [];
+    const bgSetting = settings.find((s: { key: string; value: string }) => s.key === 'neutrino_bg_url');
+    const bgMobileSetting = settings.find((s: { key: string; value: string }) => s.key === 'neutrino_bg_mobile_url');
+
+    return {
+      props: {
+        ogImageUrl: ogRes.data?.value ?? null,
+        neutrinoBg: bgSetting?.value ?? '',
+        neutrinoBgMobile: bgMobileSetting?.value ?? '',
+        neutrinoCount: countRes.count ?? 29,
+      },
+    };
+  } catch {
+    return { props: { ogImageUrl: null, neutrinoBg: '', neutrinoBgMobile: '', neutrinoCount: 29 } };
+  }
 };
 
-export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) {
+export default function HomePage({
+  ogImageUrl,
+  neutrinoBg,
+  neutrinoBgMobile,
+  neutrinoCount,
+}: {
+  ogImageUrl: string | null;
+  neutrinoBg: string;
+  neutrinoBgMobile: string;
+  neutrinoCount: number;
+}) {
   const [mounted, setMounted] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
   const [splashOut, setSplashOut] = useState(false);
   const [heroVisible, setHeroVisible] = useState(false);
-  const [neutrinoBg, setNeutrinoBg] = useState('');
-  const [bgLoaded, setBgLoaded] = useState(false);
-  const [neutrinoCount, setNeutrinoCount] = useState(29);
+  // bgLoaded: true saat tidak ada bg sama sekali, atau setelah bg yang relevan selesai dimuat
+  const [bgLoaded, setBgLoaded] = useState(!neutrinoBg && !neutrinoBgMobile);
   const { play, isReady } = useMusic();
 
   const { ref: heroRef, inView: heroInView } = useInView({ triggerOnce: true, threshold: 0.05 });
@@ -43,6 +72,22 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
     const t = setTimeout(() => setMounted(true), 80);
     return () => clearTimeout(t);
   }, []);
+
+  // Preload background image yang relevan berdasarkan ukuran layar
+  useEffect(() => {
+    // Deteksi apakah mobile (<768px) — hanya bisa di client side
+    const isMobile = window.innerWidth < 768;
+    // Pilih URL yang akan dipreload: mobile jika ada + layar kecil, fallback ke desktop
+    const bgToPreload = (isMobile && neutrinoBgMobile) ? neutrinoBgMobile
+      : neutrinoBg ? neutrinoBg
+      : null;
+
+    if (!bgToPreload) { setBgLoaded(true); return; }
+    const img = new Image();
+    img.src = bgToPreload;
+    img.onload = () => setBgLoaded(true);
+    img.onerror = () => setBgLoaded(true);
+  }, [neutrinoBg, neutrinoBgMobile]);
 
   // Trigger hero animations after splash exits
   const handleSplashEnter = useCallback((isUserClick = false) => {
@@ -62,36 +107,8 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
     }
   }, [splashDone]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase.from('site_settings').select('*');
-        if (data) {
-          let bgUrl = '';
-          data.forEach((s: { key: string; value: string }) => {
-            if (s.key === 'neutrino_bg_url' && s.value) {
-              bgUrl = s.value;
-              setNeutrinoBg(s.value);
-            }
-          });
-          if (bgUrl) {
-            const img = new Image();
-            img.src = bgUrl;
-            img.onload = () => setBgLoaded(true);
-            img.onerror = () => setBgLoaded(true);
-          } else {
-            setBgLoaded(true);
-          }
-        } else {
-          setBgLoaded(true);
-        }
-        const { count: c1 } = await supabase.from('santri').select('*', { count: 'exact', head: true }).eq('kelas', 'neutrino');
-        if (c1 !== null) setNeutrinoCount(c1);
-      } catch { setBgLoaded(true); }
-    })();
-  }, []);
-
   const isFullyReady = isReady && bgLoaded;
+
 
   return (
     <>
@@ -160,18 +177,36 @@ export default function HomePage({ ogImageUrl }: { ogImageUrl: string | null }) 
           ref={heroRef}
           className="neutrino-hero min-h-screen relative flex items-center justify-center overflow-hidden"
         >
-          {/* BG IMAGE */}
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: neutrinoBg
-                ? `url('${neutrinoBg}')`
-                : `linear-gradient(135deg, #0c0a09 0%, #1a1306 50%, #0c0a09 100%)`,
-              transform: heroVisible ? 'scale(1)' : 'scale(1.15)',
-              transition: 'all 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-              opacity: heroVisible ? (neutrinoBg ? 0.45 : 1) : 0,
-            }}
-          />
+          {/* BG IMAGE — Desktop (md ke atas) */}
+          {(neutrinoBg || !neutrinoBgMobile) && (
+            <div
+              className={neutrinoBgMobile ? 'hidden md:block absolute inset-0' : 'absolute inset-0'}
+              style={{
+                backgroundImage: neutrinoBg
+                  ? `url('${neutrinoBg}')`
+                  : `linear-gradient(135deg, #0c0a09 0%, #1a1306 50%, #0c0a09 100%)`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                transform: heroVisible ? 'scale(1)' : 'scale(1.15)',
+                transition: 'all 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                opacity: heroVisible ? (neutrinoBg ? 0.45 : 1) : 0,
+              }}
+            />
+          )}
+          {/* BG IMAGE — Mobile (sm ke bawah, hanya jika ada foto mobile) */}
+          {neutrinoBgMobile && (
+            <div
+              className="block md:hidden absolute inset-0"
+              style={{
+                backgroundImage: `url('${neutrinoBgMobile}')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center top',
+                transform: heroVisible ? 'scale(1)' : 'scale(1.15)',
+                transition: 'all 3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                opacity: heroVisible ? 0.45 : 0,
+              }}
+            />
+          )}
           {/* Overlay layers */}
           <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/80 via-charcoal-dark/20 to-charcoal-dark/95" />
           <div className="absolute inset-0 bg-gradient-to-r from-charcoal-dark/50 via-transparent to-charcoal-dark/50" />

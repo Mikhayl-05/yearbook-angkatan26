@@ -7,8 +7,20 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/context/AuthContext';
 import { MusicProvider } from '@/context/MusicContext';
 import { MusicPlayer } from '@/components/layout/MusicPlayer';
-import { AnimatePresence, motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import '../styles/globals.css';
+
+// ── Dynamic import framer-motion — hapus dari initial bundle (~50KB gzip) ──
+// Sebelumnya: import static → masuk ke bundle pertama → semua halaman kena
+// Sekarang: lazy load setelah hydration → tidak block first render
+const AnimatePresence: any = dynamic(
+  () => import('framer-motion').then(m => m.AnimatePresence),
+  { ssr: false }
+);
+const MotionDiv: any = dynamic(
+  () => import('framer-motion').then(m => m.motion.div as any),
+  { ssr: false }
+);
 
 function ScrollProgressBar() {
   const [progress, setProgress] = useState(0);
@@ -35,15 +47,15 @@ function ScrollProgressBar() {
 }
 
 const pageVariants = {
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 10 },
   in: { opacity: 1, y: 0 },
-  out: { opacity: 0, y: -8 },
+  out: { opacity: 0, y: -6 },
 };
 
 const pageTransition = {
-  type: 'tween',
+  type: 'tween' as const,
   ease: [0.16, 1, 0.3, 1],
-  duration: 0.35,
+  duration: 0.3, // Sedikit lebih cepat dari sebelumnya (0.35 → 0.3)
 };
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -75,7 +87,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <MusicProvider>
           <ScrollProgressBar />
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div
+            <MotionDiv
               key={router.asPath}
               initial="initial"
               animate="in"
@@ -84,7 +96,7 @@ export default function App({ Component, pageProps }: AppProps) {
               transition={pageTransition}
             >
               <Component {...pageProps} />
-            </motion.div>
+            </MotionDiv>
           </AnimatePresence>
           {!isAdmin && <MusicPlayer />}
           <Toaster
