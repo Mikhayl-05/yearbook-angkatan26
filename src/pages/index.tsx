@@ -130,12 +130,7 @@ export default function HomePage({
 
   return (
     <>
-      <Head>
-        {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
-        {ogImageUrl && <meta property="og:image:secure_url" content={ogImageUrl} />}
-        {ogImageUrl && <meta property="og:image:type" content="image/jpeg" />}
-        {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
-      </Head>
+
 
       {/* ── SPLASH ─────────────────────────────────────────────── */}
       {!splashDone && (

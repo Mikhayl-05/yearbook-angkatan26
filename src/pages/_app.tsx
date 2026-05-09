@@ -80,24 +80,17 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>Yearbook Angkatan 26 — MTS Wahdah Islamiyah</title>
         <meta name="description" content="Digital Yearbook Angkatan 26 MTS Pondok Pesantren Wahdah Islamiyah Bonebolango — Neutrino 2023-2026" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        <meta name="theme-color" content="#C9A227" />
-        <meta name="application-name" content="YB-A26" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="YB-A26" />
-        {/* OG Tags */}
-        <meta property="og:title" content="Yearbook Angkatan 26 — MTS Wahdah Islamiyah Bonebolango" />
-        <meta property="og:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Yearbook Angkatan 26" />
-        {/* Twitter Card — diperlukan agar WhatsApp & Twitter bisa baca og:image */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Yearbook Angkatan 26 — MTS Wahdah Islamiyah Bonebolango" />
-        <meta name="twitter:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
-        {/* Icons */}
-        <link rel="icon" href="/icons/icon-192x192.png" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <link rel="manifest" href="/manifest.json" />
+        
+        {/* Dynamic OG Image handling from pageProps */}
+        {pageProps?.ogImageUrl && (
+          <>
+            <meta property="og:image" content={pageProps.ogImageUrl} />
+            <meta property="og:image:secure_url" content={pageProps.ogImageUrl} />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
+            <meta name="twitter:image" content={pageProps.ogImageUrl} />
+          </>
+        )}
       </Head>
 
       <AuthProvider>
