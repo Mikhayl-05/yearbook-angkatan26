@@ -28,17 +28,19 @@ export const getServerSideProps = async () => {
     const settings = settingsRes.data ?? [];
     const bgSetting = settings.find((s: { key: string; value: string }) => s.key === 'neutrino_bg_url');
     const bgMobileSetting = settings.find((s: { key: string; value: string }) => s.key === 'neutrino_bg_mobile_url');
+    const logoSetting = settings.find((s: { key: string; value: string }) => s.key === 'neutrino_logo_url');
 
     return {
       props: {
         ogImageUrl: ogRes.data?.value ?? null,
         neutrinoBg: bgSetting?.value ?? '',
         neutrinoBgMobile: bgMobileSetting?.value ?? '',
+        neutrinoLogo: logoSetting?.value ?? '',
         neutrinoCount: countRes.count ?? 29,
       },
     };
   } catch {
-    return { props: { ogImageUrl: null, neutrinoBg: '', neutrinoBgMobile: '', neutrinoCount: 29 } };
+    return { props: { ogImageUrl: null, neutrinoBg: '', neutrinoBgMobile: '', neutrinoLogo: '', neutrinoCount: 29 } };
   }
 };
 
@@ -46,11 +48,13 @@ export default function HomePage({
   ogImageUrl,
   neutrinoBg,
   neutrinoBgMobile,
+  neutrinoLogo,
   neutrinoCount,
 }: {
   ogImageUrl: string | null;
   neutrinoBg: string;
   neutrinoBgMobile: string;
+  neutrinoLogo: string;
   neutrinoCount: number;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -136,11 +140,17 @@ export default function HomePage({
           </div>
 
           <div className={`relative z-10 text-center px-6 flex flex-col items-center transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex flex-col items-center justify-center mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)]"
-              style={{ background: 'rgba(28,16,4,0.9)' }}>
-              <span className="text-gold font-heading font-bold text-2xl leading-none">16</span>
-              <span className="text-gold/50 font-heading text-[9px] tracking-widest">XVI</span>
-            </div>
+            {neutrinoLogo ? (
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)] flex items-center justify-center p-2 bg-charcoal-dark/50 border-2 border-gold/40 backdrop-blur-sm">
+                <img src={neutrinoLogo} alt="Logo Neutrino" className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex flex-col items-center justify-center mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)]"
+                style={{ background: 'rgba(28,16,4,0.9)' }}>
+                <span className="text-gold font-heading font-bold text-2xl leading-none">16</span>
+                <span className="text-gold/50 font-heading text-[9px] tracking-widest">XVI</span>
+              </div>
+            )}
             <div className="section-label text-[10px] text-gold/60 mb-3 tracking-[0.5em]">MTs Wahdah Islamiyah · Bone Bolango</div>
             <h1 className="font-display text-gold-gradient font-black" style={{ fontSize: 'clamp(2.2rem, 10vw, 6rem)', lineHeight: 0.9 }}>ANGKATAN</h1>
             <h1 className="font-display text-cream font-black mb-6" style={{ fontSize: 'clamp(2.2rem, 10vw, 6rem)', lineHeight: 0.9 }}>2026</h1>
@@ -301,6 +311,9 @@ export default function HomePage({
             <div className="divider-ornament justify-center mb-10 sm:mb-12">
               <span className="section-label text-xs">Menuju Kelulusan</span>
             </div>
+            {neutrinoLogo && (
+              <img src={neutrinoLogo} alt="Logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain mx-auto mb-6 drop-shadow-[0_0_15px_rgba(201,162,39,0.3)]" />
+            )}
             <CountdownTimer targetDate={GRADUATION_DATE} />
           </div>
         </section>

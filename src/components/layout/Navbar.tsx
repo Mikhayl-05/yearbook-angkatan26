@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { useMusic } from '@/context/MusicContext';
+import { supabase } from '@/lib/supabase';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -17,6 +18,7 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [neutrinoLogo, setNeutrinoLogo] = useState('');
   const { user, isAdmin, signOut } = useAuth();
   const { isPlaying, currentTrack, setIsMinimized, isMinimized } = useMusic();
   const router = useRouter();
@@ -24,6 +26,12 @@ export default function Navbar() {
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll);
+    
+    // Fetch Logo
+    supabase.from('site_settings').select('value').eq('key', 'neutrino_logo_url').single().then(({ data }) => {
+      if (data) setNeutrinoLogo(data.value);
+    });
+
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
@@ -54,9 +62,15 @@ export default function Navbar() {
 
             {/* LOGO */}
             <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
-              <div className="w-8 h-8 rounded-full border border-gold/60 flex items-center justify-center group-hover:border-gold transition-colors flex-shrink-0">
-                <span className="text-gold text-xs font-heading font-bold">26</span>
-              </div>
+              {neutrinoLogo ? (
+                <div className="w-8 h-8 rounded-full border border-gold/60 flex items-center justify-center p-0.5 bg-charcoal-dark/50 group-hover:border-gold transition-colors flex-shrink-0">
+                  <img src={neutrinoLogo} alt="Logo" className="w-full h-full object-contain" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full border border-gold/60 flex items-center justify-center group-hover:border-gold transition-colors flex-shrink-0">
+                  <span className="text-gold text-xs font-heading font-bold">26</span>
+                </div>
+              )}
               <div className="hidden sm:block">
                 <div className="text-gold font-heading text-[10px] tracking-[0.3em] uppercase">Angkatan</div>
                 <div className="text-cream font-display text-sm font-bold -mt-0.5">Wahdah Islamiyah</div>

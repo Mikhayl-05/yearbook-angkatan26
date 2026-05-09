@@ -8,6 +8,7 @@ import { DRIVE_COLOR_PRESETS } from '@/pages/drive';
 import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import { LINK_GRADIENT_PRESETS } from '@/components/sections/StudentCard';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type AdminTab = 'dashboard' | 'santri' | 'guru' | 'gallery' | 'submissions' | 'notes' | 'playlist' | 'timeline' | 'settings' | 'users' | 'eggphotos' | 'drive';
 
@@ -183,7 +184,7 @@ function DashboardTab({ stats, setTab }: { stats: any; setTab: (t: AdminTab) => 
       </div>
       {stats.pending > 0 && (
         <button onClick={() => setTab('submissions')} className="admin-btn admin-btn-primary w-full py-3 justify-center">
-          📤 Ada {stats.pending} foto menunggu persetujuan →
+          📤 Ada {stats.pending} foto menunggu persetujuan â†’
         </button>
       )}
     </div>
@@ -614,7 +615,7 @@ function AddSantriModal({ scopeKelas, onClose, onSave }: { scopeKelas: string | 
       <div className="admin-modal max-w-lg" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-display text-cream text-lg font-bold">Tambah Santri Baru</h3>
-          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl">×</button>
+          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl">Ã—</button>
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -1122,7 +1123,7 @@ function SubmissionsTab({ onUpdate, scopeKelas }: { onUpdate: () => void; scopeK
                 {sub.article_text && <p className="text-cream/50 text-xs mt-2 line-clamp-3">{sub.article_text}</p>}
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => handleApprove(sub)} className="admin-btn admin-btn-success text-xs btn-press-active">✅ Setujui</button>
-                  <button onClick={() => handleReject(sub.id)} className="admin-btn admin-btn-danger text-xs btn-press-active">❌ Tolak</button>
+                  <button onClick={() => handleReject(sub.id)} className="admin-btn admin-btn-danger text-xs btn-press-active">âŒ Tolak</button>
                 </div>
               </div>
             </div>
@@ -1189,7 +1190,6 @@ function NotesTab({ scopeKelas }: { scopeKelas: string | null }) {
 }
 
 // ── PLAYLIST TAB ──────────────────────
-import { motion, AnimatePresence } from 'framer-motion';
 
 function PlaylistTab({ scopeKelas }: { scopeKelas: string | null }) {
   const [tracks, setTracks] = useState<{ id: string; title: string; artist: string; url: string; order_num: number; kelas?: string }[]>([]);
@@ -1542,6 +1542,7 @@ function SettingsTab() {
   const [neutrinoBgMobile, setNeutrinoBgMobile] = useState('');
   const [allAxeBg, setAllAxeBg] = useState('');
   const [ogBg, setOgBg] = useState('');
+  const [neutrinoLogo, setNeutrinoLogo] = useState('');
   const [saving, setSaving] = useState<string|null>(null);
 
   useEffect(() => {
@@ -1551,6 +1552,7 @@ function SettingsTab() {
         if (s.key === 'neutrino_bg_mobile_url')  setNeutrinoBgMobile(s.value||'');
         if (s.key === 'allaxe_bg_url')           setAllAxeBg(s.value||'');
         if (s.key === 'og_image_url')            setOgBg(s.value||'');
+        if (s.key === 'neutrino_logo_url')       setNeutrinoLogo(s.value||'');
       });
     });
   }, []);
@@ -1561,6 +1563,7 @@ function SettingsTab() {
     if (key === 'neutrino_bg_mobile_url')  return neutrinoBgMobile;
     if (key === 'allaxe_bg_url')          return allAxeBg;
     if (key === 'og_image_url')           return ogBg;
+    if (key === 'neutrino_logo_url')      return neutrinoLogo;
     return '';
   };
   const setByKey = (key: string, val: string) => {
@@ -1568,24 +1571,30 @@ function SettingsTab() {
     if (key === 'neutrino_bg_mobile_url')  setNeutrinoBgMobile(val);
     if (key === 'allaxe_bg_url')          setAllAxeBg(val);
     if (key === 'og_image_url')           setOgBg(val);
+    if (key === 'neutrino_logo_url')      setNeutrinoLogo(val);
   };
 
   const handleUploadBg = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     // Validasi format gambar
-    const ALLOWED = ['image/jpeg','image/jpg','image/png','image/webp'];
-    if (!ALLOWED.includes(file.type)) { toast.error('Gunakan JPG, PNG, atau WEBP!'); return; }
-    if (file.size > 10 * 1024 * 1024) { toast.error('Ukuran max 10MB untuk background!'); return; }
-    // Guard Root Admin untuk mobile bg
-    if (key === 'neutrino_bg_mobile_url' && !isRootAdmin) {
-      toast.error('Hanya Root Admin yang bisa mengubah background mobile!'); return;
+    const ALLOWED = ['image/jpeg','image/jpg','image/png','image/webp','image/svg+xml'];
+    if (!ALLOWED.includes(file.type)) { toast.error('Gunakan JPG, PNG, WEBP, atau SVG!'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Ukuran max 10MB untuk foto!'); return; }
+    // Guard Root Admin
+    if ((key === 'neutrino_bg_mobile_url' || key === 'neutrino_bg_url' || key === 'neutrino_logo_url') && !isRootAdmin) {
+      toast.error('Hanya Root Admin yang bisa mengubah pengaturan ini!'); return;
     }
     setSaving(key);
     try {
       const oldUrl = getByKey(key);
       const ext = file.name.split('.').pop() || 'jpg';
-      const url = await uploadImage(file, `settings/${key}_${Date.now()}.${ext}`);
+      let url;
+      if (key === 'neutrino_bg_url' || key === 'neutrino_bg_mobile_url' || key === 'neutrino_logo_url') {
+        url = await uploadPhoto(file, `settings/${key}_${Date.now()}.${ext}`);
+      } else {
+        url = await uploadImage(file, `settings/${key}_${Date.now()}.${ext}`);
+      }
       const { error } = await supabase.from('site_settings').upsert({key, value:url, updated_at:new Date().toISOString()}, { onConflict: 'key' });
       if (error) throw error;
       if (oldUrl) await deleteFileFromStorage(oldUrl);
@@ -1596,10 +1605,10 @@ function SettingsTab() {
   };
 
   const handleResetBg = async (key: string) => {
-    if (!confirm('Reset background ke default? File akan dihapus dari storage.')) return;
-    // Guard Root Admin untuk mobile bg
-    if (key === 'neutrino_bg_mobile_url' && !isRootAdmin) {
-      toast.error('Hanya Root Admin yang bisa mereset background mobile!'); return;
+    if (!confirm('Reset pengaturan ke default? File akan dihapus dari storage.')) return;
+    // Guard Root Admin
+    if ((key === 'neutrino_bg_mobile_url' || key === 'neutrino_bg_url' || key === 'neutrino_logo_url') && !isRootAdmin) {
+      toast.error('Hanya Root Admin yang bisa mereset pengaturan ini!'); return;
     }
     setSaving(key + '_reset');
     try {
@@ -1618,80 +1627,88 @@ function SettingsTab() {
       <h2 className="font-display text-cream text-xl font-bold mb-2">Pengaturan</h2>
       <p className="text-cream/40 text-xs font-body mb-8">Kelola tampilan halaman utama</p>
       <div className="space-y-6 max-w-lg">
-        {/* Background Neutrino — Desktop */}
-        <div className="card-dark p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
-            <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">🖥 Desktop</span>
-          </div>
-          <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino (halaman beranda) untuk tampilan Desktop/PC. Ditampilkan dengan opacity rendah agar teks tetap terbaca.</p>
-          {neutrinoBg ? (
-            <div className="relative mb-3">
-              <img src={neutrinoBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
-              <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
-              <div className="absolute top-2 right-2">
-                <button
-                  onClick={() => handleResetBg('neutrino_bg_url')}
-                  disabled={saving === 'neutrino_bg_url_reset'}
-                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
-                >
-                  🗑 Reset ke Default
-                </button>
-              </div>
-              <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview (dengan efek fade)</p>
-            </div>
-          ) : (
-            <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
-              <span className="text-cream/30 text-xs">Menggunakan foto default</span>
-            </div>
-          )}
-          <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
-            {saving === 'neutrino_bg_url' ? '⏳ Uploading...' : '📷 Upload Background Desktop'}
-            <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_url', e)} disabled={!!saving} />
-          </label>
-        </div>
-
-        {/* Background Neutrino — Mobile (Root Admin Only) */}
         {isRootAdmin && (
-          <div className="card-dark p-6 border border-gold/30">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-orange-500/20 text-orange-300 border border-orange-500/30">📱 Mobile</span>
-              <span className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-gold/20 text-gold border border-gold/40">⚡ Root Admin</span>
-            </div>
-            <p className="text-cream/40 text-xs mb-4">
-              Foto latar khusus tampilan Mobile/HP. Disarankan gunakan foto portrait (rasio 9:16) agar tampil lebih baik di layar kecil.
-              Jika tidak diset, otomatis menggunakan foto Desktop.
-            </p>
-            {neutrinoBgMobile ? (
-              <div className="relative mb-3">
-                <img src={neutrinoBgMobile} className="w-full h-40 object-cover rounded-lg border border-orange-500/30" style={{opacity:0.7, objectPosition:'center top'}} />
-                <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/40 to-charcoal-dark/70 rounded-lg" />
-                <div className="absolute top-2 right-2">
-                  <button
-                    onClick={() => handleResetBg('neutrino_bg_mobile_url')}
-                    disabled={saving === 'neutrino_bg_mobile_url_reset'}
-                    className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
-                  >
-                    🗑 Reset
-                  </button>
+          <>
+            <div className="card-dark p-6 border border-gold/30">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-blue-500/20 text-blue-300 border border-blue-500/30">Desktop</span>
+                <span className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-gold/20 text-gold border border-gold/40">Root Admin</span>
+              </div>
+              <p className="text-cream/40 text-xs mb-4">Foto latar di panel Neutrino untuk tampilan Desktop/PC. Menggunakan resolusi asli gambar.</p>
+              {neutrinoBg ? (
+                <div className="relative mb-3">
+                  <img src={neutrinoBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" style={{opacity:0.6}} />
+                  <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/50 to-charcoal-dark/80 rounded-lg" />
+                  <div className="absolute top-2 right-2">
+                    <button onClick={() => handleResetBg('neutrino_bg_url')} disabled={saving === 'neutrino_bg_url_reset'} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Reset ke Default</button>
+                  </div>
+                  <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview</p>
                 </div>
-                <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview mobile (portrait)</p>
+              ) : (
+                <div className="h-24 rounded-lg border-2 border-dashed border-gold/20 flex items-center justify-center mb-3">
+                  <span className="text-cream/30 text-xs">Menggunakan foto default</span>
+                </div>
+              )}
+              <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+                {saving === 'neutrino_bg_url' ? 'Uploading...' : 'Upload Background Desktop'}
+                <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_url', e)} disabled={!!saving} />
+              </label>
+            </div>
+            <div className="card-dark p-6 border border-gold/30">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-cream text-sm font-display font-bold">Background Neutrino</h3>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-orange-500/20 text-orange-300 border border-orange-500/30">Mobile</span>
+                <span className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-gold/20 text-gold border border-gold/40">Root Admin</span>
               </div>
-            ) : (
-              <div className="h-32 rounded-lg border-2 border-dashed border-orange-500/20 flex flex-col items-center justify-center mb-3 gap-1">
-                <span className="text-2xl">📱</span>
-                <span className="text-cream/30 text-xs">Belum diset — menggunakan foto Desktop</span>
+              <p className="text-cream/40 text-xs mb-4">Foto latar khusus Mobile/HP portrait (9:16). Jika tidak diset, menggunakan foto Desktop. Resolusi asli.</p>
+              {neutrinoBgMobile ? (
+                <div className="relative mb-3">
+                  <img src={neutrinoBgMobile} className="w-full h-40 object-cover rounded-lg border border-orange-500/30" style={{opacity:0.7, objectPosition:'center top'}} />
+                  <div className="absolute inset-0 bg-gradient-to-b from-charcoal-dark/40 to-charcoal-dark/70 rounded-lg" />
+                  <div className="absolute top-2 right-2">
+                    <button onClick={() => handleResetBg('neutrino_bg_mobile_url')} disabled={saving === 'neutrino_bg_mobile_url_reset'} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Reset</button>
+                  </div>
+                  <p className="absolute bottom-2 left-3 text-cream/60 text-[10px]">Preview mobile (portrait)</p>
+                </div>
+              ) : (
+                <div className="h-32 rounded-lg border-2 border-dashed border-orange-500/20 flex flex-col items-center justify-center mb-3 gap-1">
+                  <span className="text-2xl">📱</span>
+                  <span className="text-cream/30 text-xs">Belum diset — menggunakan foto Desktop</span>
+                </div>
+              )}
+              <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_mobile_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+                {saving === 'neutrino_bg_mobile_url' ? 'Uploading...' : 'Upload Background Mobile'}
+                <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_mobile_url', e)} disabled={!!saving} />
+              </label>
+            </div>
+            <div className="card-dark p-6 border border-gold/30">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-cream text-sm font-display font-bold">Logo Neutrino</h3>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">Ikon</span>
+                <span className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-heading tracking-wider bg-gold/20 text-gold border border-gold/40">Root Admin</span>
               </div>
-            )}
-            <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_bg_mobile_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
-              {saving === 'neutrino_bg_mobile_url' ? '⏳ Uploading...' : '📱 Upload Background Mobile'}
-              <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_bg_mobile_url', e)} disabled={!!saving} />
-            </label>
-          </div>
+              <p className="text-cream/40 text-xs mb-4">Logo khusus kelas Neutrino. Gunakan <strong className="text-gold">PNG atau SVG</strong> dengan latar transparan (persegi).</p>
+              {neutrinoLogo ? (
+                <div className="relative mb-3 flex items-center justify-center p-4 rounded-lg border border-gold/20 bg-charcoal-dark/50" style={{ backgroundImage: 'radial-gradient(rgba(201,162,39,0.1) 1px, transparent 1px)', backgroundSize: '10px 10px' }}>
+                  <img src={neutrinoLogo} className="w-24 h-24 object-contain drop-shadow-[0_0_15px_rgba(201,162,39,0.3)]" />
+                  <div className="absolute top-2 right-2">
+                    <button onClick={() => handleResetBg('neutrino_logo_url')} disabled={saving === 'neutrino_logo_url_reset'} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Reset</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-32 rounded-lg border-2 border-dashed border-purple-500/20 flex flex-col items-center justify-center mb-3 gap-1">
+                  <span className="text-2xl">✨</span>
+                  <span className="text-cream/30 text-xs">Belum ada logo (menggunakan teks default 16/26)</span>
+                </div>
+              )}
+              <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'neutrino_logo_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
+                {saving === 'neutrino_logo_url' ? 'Uploading...' : 'Upload Logo Neutrino'}
+                <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('neutrino_logo_url', e)} disabled={!!saving} />
+              </label>
+            </div>
+          </>
         )}
-
-        {/* OG Image Preview */}
         <div className="card-dark p-6">
           <h3 className="text-cream text-sm font-display font-bold mb-1">Foto Preview Web (Open Graph)</h3>
           <p className="text-cream/40 text-xs mb-4">Foto yang akan muncul saat link web ini dibagikan di WhatsApp, Telegram, atau Medsos lainnya.</p>
@@ -1699,13 +1716,7 @@ function SettingsTab() {
             <div className="relative mb-3">
               <img src={ogBg} className="w-full h-32 object-cover rounded-lg border border-gold/20" />
               <div className="absolute top-2 right-2">
-                <button
-                  onClick={() => handleResetBg('og_image_url')}
-                  disabled={saving === 'og_image_url_reset'}
-                  className="admin-btn admin-btn-danger text-[10px] py-1 px-2"
-                >
-                  🗑 Reset
-                </button>
+                <button onClick={() => handleResetBg('og_image_url')} disabled={saving === 'og_image_url_reset'} className="admin-btn admin-btn-danger text-[10px] py-1 px-2">Reset</button>
               </div>
             </div>
           ) : (
@@ -1714,7 +1725,7 @@ function SettingsTab() {
             </div>
           )}
           <label className={`admin-btn admin-btn-ghost w-full py-2.5 justify-center cursor-pointer text-xs block text-center btn-press-active ${saving === 'og_image_url' ? 'btn-loading-shimmer opacity-50' : ''}`}>
-            {saving === 'og_image_url' ? '⏳ Uploading...' : '📷 Upload Foto Preview URL'}
+            {saving === 'og_image_url' ? 'Uploading...' : 'Upload Foto Preview URL'}
             <input type="file" accept="image/*" className="hidden" onChange={e => handleUploadBg('og_image_url', e)} disabled={!!saving} />
           </label>
         </div>
@@ -1723,7 +1734,7 @@ function SettingsTab() {
   );
 }
 
-// ── USERS / ACCOUNTS TAB ──────────────
+// -- USERS / ACCOUNTS TAB ------------------
 type UserRow = {
   id: string;
   email: string;
@@ -1840,7 +1851,7 @@ function UsersTab({ session }: { session: any }) {
       {error && (
         <div className="card-dark border border-red-500/30 p-5 mb-6 rounded-xl">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
+            <span className="text-2xl">âš ï¸</span>
             <div>
               <p className="text-red-400 font-heading text-sm font-bold mb-1">Tidak bisa memuat akun</p>
               <p className="text-cream/50 text-xs">{error}</p>
@@ -1877,7 +1888,7 @@ function UsersTab({ session }: { session: any }) {
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowAdd(false)} className="admin-btn admin-btn-ghost flex-1 py-2 justify-center text-xs btn-press-active">Batal</button>
               <button onClick={handleCreate} disabled={creating} className={`admin-btn admin-btn-primary flex-1 py-2 justify-center text-xs btn-press-active ${creating ? 'btn-loading-shimmer opacity-80' : ''}`}>
-                {creating ? '⏳ Membuat...' : '+ Buat Akun'}
+                {creating ? 'â³ Membuat...' : '+ Buat Akun'}
               </button>
             </div>
           </div>
@@ -2549,7 +2560,7 @@ function EasterEggPhotosTab() {
                     onClick={() => handleDelete(photo.id, photo.url)}
                     className="bg-red-900/80 hover:bg-red-700 text-white text-[10px] px-2 py-0.5 rounded transition-colors"
                   >
-                    ×
+                    Ã—
                   </button>
                 </div>
               </div>

@@ -62,6 +62,18 @@ export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const isAdmin = router.pathname.startsWith('/admin');
 
+  useEffect(() => {
+    // Unregister service worker aggressively in development to prevent caching loops
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('Stale ServiceWorker unregistered in dev mode.');
+        }
+      });
+    }
+  }, []);
+
   return (
     <>
       <Head>
