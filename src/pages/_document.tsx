@@ -41,17 +41,6 @@ export default function Document() {
         {/* ── ICONS ─────────────────────────────────────────────── */}
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-
-        {/* ── OPEN GRAPH (statis) — agar WhatsApp/Telegram/Twitter bisa baca */}
-        <meta property="og:title" content="Yearbook Angkatan 26 — Neutrino MTS Wahdah Islamiyah" />
-        <meta property="og:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023–2026" />
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Yearbook Angkatan 26" />
-        <meta property="og:locale" content="id_ID" />
-        {/* Twitter Card — wajib untuk WhatsApp agar gambar muncul */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Yearbook Angkatan 26 — Neutrino MTS Wahdah Islamiyah" />
-        <meta name="twitter:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023–2026" />
       </Head>
       <body>
         <Main />
