@@ -5,6 +5,15 @@ export default function Document() {
   return (
     <Html lang="id" prefix="og: https://ogp.me/ns#">
       <Head>
+        {/* ── STATIC FALLBACK OPEN GRAPH ── */}
+        <meta property="og:site_name" content="Yearbook Angkatan 26" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Yearbook Angkatan 26 - Neutrino MTS Wahdah Islamiyah" />
+        <meta property="og:description" content="Kenangan digital Angkatan 26 - Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023-2026" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        
         {/* ── DNS PREFETCH (mempercepat koneksi awal) ─────────── */}
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
         <link rel="dns-prefetch" href="//fonts.gstatic.com" />

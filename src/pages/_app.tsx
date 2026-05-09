@@ -65,8 +65,8 @@ export default function App({ Component, pageProps }: AppProps) {
   // Menyiapkan metadata untuk Open Graph
   const domain = 'https://yearbook-neutrino.vercel.app';
   const currentUrl = `${domain}${router.asPath === '/' ? '' : router.asPath}`;
-  const title = 'Yearbook Angkatan 26 — Neutrino MTS Wahdah Islamiyah';
-  const description = 'Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023–2026';
+  const title = 'Yearbook Angkatan 26 - Neutrino MTS Wahdah Islamiyah';
+  const description = 'Kenangan digital Angkatan 26 - Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023-2026';
   
   // Mencari gambar yang valid untuk preview.
   let ogImage = `${domain}/icons/icon-512x512.png`;
@@ -105,9 +105,10 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta property="og:site_name" content="Yearbook Angkatan 26" key="og-site" />
         <meta property="og:locale" content="id_ID" key="og-locale" />
         
-        {/* Gambar wajib absolut untuk WhatsApp */}
-        <meta property="og:image" content={ogImage} key="og-image" />
-        <meta property="og:image:secure_url" content={ogImage} key="og-image-secure" />
+        {/* Gambar wajib absolut untuk WhatsApp & Instagram */}
+        <meta property="og:image" itemProp="image" content={ogImage} key="og-image" />
+        <meta property="og:image:secure_url" itemProp="image" content={ogImage} key="og-image-secure" />
+        <meta property="og:image:type" content="image/png" key="og-image-type" />
         <meta property="og:image:width" content="1200" key="og-image-width" />
         <meta property="og:image:height" content="630" key="og-image-height" />
         
