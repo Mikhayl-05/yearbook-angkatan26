@@ -68,10 +68,15 @@ export default function App({ Component, pageProps }: AppProps) {
   const title = 'Yearbook Angkatan 26 — Neutrino MTS Wahdah Islamiyah';
   const description = 'Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango 2023–2026';
   
-  // Mencari gambar yang valid untuk preview. Urutan: ogImageUrl -> neutrinoLogo -> fallback icon
-  const rawImage = pageProps?.ogImageUrl || pageProps?.neutrinoLogo || `${domain}/icons/icon-512x512.png`;
+  // Mencari gambar yang valid untuk preview.
+  let ogImage = `${domain}/icons/icon-512x512.png`;
+  if (pageProps?.ogImageUrl) ogImage = pageProps.ogImageUrl;
+  else if (pageProps?.neutrinoLogo) ogImage = pageProps.neutrinoLogo;
+  
   // Pastikan URL gambar adalah absolute (wajib untuk WhatsApp)
-  const ogImage = rawImage.startsWith('http') ? rawImage : `${domain}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`;
+  if (!ogImage.startsWith('http')) {
+    ogImage = `${domain}${ogImage.startsWith('/') ? '' : '/'}${ogImage}`;
+  }
 
   useEffect(() => {
     // Unregister service worker aggressively in development to prevent caching loops
@@ -88,29 +93,29 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
-        <title>{title}</title>
-        <meta name="description" content={description} />
+        <title key="title">{title}</title>
+        <meta name="description" content={description} key="description" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         
         {/* ── OPEN GRAPH (Dinamis & Terpusat) ── */}
-        <meta property="og:title" content={title} />
-        <meta property="og:description" content={description} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={currentUrl} />
-        <meta property="og:site_name" content="Yearbook Angkatan 26" />
-        <meta property="og:locale" content="id_ID" />
+        <meta property="og:title" content={title} key="og-title" />
+        <meta property="og:description" content={description} key="og-desc" />
+        <meta property="og:type" content="website" key="og-type" />
+        <meta property="og:url" content={currentUrl} key="og-url" />
+        <meta property="og:site_name" content="Yearbook Angkatan 26" key="og-site" />
+        <meta property="og:locale" content="id_ID" key="og-locale" />
         
         {/* Gambar wajib absolut untuk WhatsApp */}
-        <meta property="og:image" content={ogImage} />
-        <meta property="og:image:secure_url" content={ogImage} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
+        <meta property="og:image" content={ogImage} key="og-image" />
+        <meta property="og:image:secure_url" content={ogImage} key="og-image-secure" />
+        <meta property="og:image:width" content="1200" key="og-image-width" />
+        <meta property="og:image:height" content="630" key="og-image-height" />
         
-        {/* ── TWITTER CARD (Wajib untuk beberapa platform) ── */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={title} />
-        <meta name="twitter:description" content={description} />
-        <meta name="twitter:image" content={ogImage} />
+        {/* ── TWITTER CARD ── */}
+        <meta name="twitter:card" content="summary_large_image" key="tw-card" />
+        <meta name="twitter:title" content={title} key="tw-title" />
+        <meta name="twitter:description" content={description} key="tw-desc" />
+        <meta name="twitter:image" content={ogImage} key="tw-image" />
       </Head>
 
       <AuthProvider>

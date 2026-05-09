@@ -3,7 +3,7 @@ import { Html, Head, Main, NextScript } from 'next/document';
 
 export default function Document() {
   return (
-    <Html lang="id">
+    <Html lang="id" prefix="og: https://ogp.me/ns#">
       <Head>
         {/* ── DNS PREFETCH (mempercepat koneksi awal) ─────────── */}
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
