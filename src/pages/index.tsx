@@ -61,6 +61,8 @@ export default function HomePage({
   const [splashDone, setSplashDone] = useState(false);
   const [splashOut, setSplashOut] = useState(false);
   const [heroVisible, setHeroVisible] = useState(false);
+  const [logoReady, setLogoReady] = useState(!neutrinoLogo); // true jika tidak ada logo (langsung siap)
+  const [showShockwave, setShowShockwave] = useState(false);
   // bgLoaded: true saat tidak ada bg sama sekali, atau setelah bg yang relevan selesai dimuat
   const [bgLoaded, setBgLoaded] = useState(!neutrinoBg && !neutrinoBgMobile);
   const { play, isReady } = useMusic();
@@ -111,65 +113,235 @@ export default function HomePage({
     }
   }, [splashDone]);
 
-  const isFullyReady = isReady && bgLoaded;
+  const isFullyReady = isReady && bgLoaded && logoReady;
+
+  // Trigger shockwave burst saat transisi loading → ready
+  useEffect(() => {
+    if (isFullyReady && !splashDone) {
+      const t = setTimeout(() => {
+        setShowShockwave(true);
+        // Reset shockwave setelah animasinya selesai
+        setTimeout(() => setShowShockwave(false), 700);
+      }, 100);
+      return () => clearTimeout(t);
+    }
+  }, [isFullyReady, splashDone]);
 
 
   return (
     <>
       <Head>
         {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+        {ogImageUrl && <meta property="og:image:secure_url" content={ogImageUrl} />}
+        {ogImageUrl && <meta property="og:image:type" content="image/jpeg" />}
+        {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
       </Head>
 
       {/* ── SPLASH ─────────────────────────────────────────────── */}
       {!splashDone && (
         <div
           className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-all duration-700 ${splashOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'}`}
-          style={{ background: 'radial-gradient(ellipse at center, #1c1008 0%, #0c0a09 60%, #050403 100%)' }}
+          style={{ background: 'radial-gradient(ellipse at 50% 38%, #231204 0%, #130b04 30%, #0c0a09 60%, #050403 100%)' }}
         >
-          {/* Splash particles - CSS only, no JS heavy lifting */}
+          {/* ── Latar sinematik: sorot cahaya tengah */}
+          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 40%, rgba(201,162,39,0.07) 0%, transparent 70%)' }} />
+
+          {/* ── Particles — lebih banyak, variasi ukuran & kecepatan */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="absolute w-1 h-1 rounded-full bg-gold opacity-0"
+            {[...Array(20)].map((_, i) => {
+              const size  = i % 3 === 0 ? 'w-1.5 h-1.5' : i % 3 === 1 ? 'w-1 h-1' : 'w-0.5 h-0.5';
+              const speed = 6 + (i % 7);
+              const delay = i * 0.35;
+              const dx    = (i % 2 === 0 ? 1 : -1) * (20 + i * 6);
+              return (
+                <div
+                  key={i}
+                  className={`absolute rounded-full bg-gold opacity-0 ${size}`}
+                  style={{
+                    left: `${(i * 5.1 + 3) % 94}%`,
+                    top: `${(i % 5) * 20 + 5}%`,
+                    animation: `particleDrift ${speed}s ease-in ${delay}s infinite`,
+                    '--dx': `${dx}px`,
+                  } as React.CSSProperties}
+                />
+              );
+            })}
+            {/* Dot-dot kecil melayang dekat logo */}
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={`fdot-${i}`}
+                className="absolute w-0.5 h-0.5 rounded-full bg-gold/60 opacity-0"
                 style={{
-                  left: `${(i * 8.3 + 5)}%`, top: `${(i % 4) * 25 + 12}%`,
-                  animation: `particleDrift ${7 + i % 5}s ease-in ${i * 0.4}s infinite`,
-                  '--dx': `${(i % 2 === 0 ? 1 : -1) * (30 + i * 5)}px`,
-                } as React.CSSProperties}
+                  left: `${42 + (i % 2 === 0 ? -1 : 1) * (8 + i * 4)}%`,
+                  top: `${35 + i * 5}%`,
+                  animation: `floatDot ${3 + i * 0.5}s ease-in-out ${i * 0.6}s infinite`,
+                }}
               />
             ))}
           </div>
 
-          <div className={`relative z-10 text-center px-6 flex flex-col items-center transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            {neutrinoLogo ? (
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)] flex items-center justify-center p-2 bg-charcoal-dark/50 border-2 border-gold/40 backdrop-blur-sm">
-                <img src={neutrinoLogo} alt="Logo Neutrino" className="w-full h-full object-contain" />
-              </div>
-            ) : (
-              <div className="w-20 h-20 rounded-full border-2 border-gold/60 flex flex-col items-center justify-center mb-8 shadow-[0_0_40px_rgba(201,162,39,0.4)]"
-                style={{ background: 'rgba(28,16,4,0.9)' }}>
-                <span className="text-gold font-heading font-bold text-2xl leading-none">16</span>
-                <span className="text-gold/50 font-heading text-[9px] tracking-widest">XVI</span>
-              </div>
-            )}
-            <div className="section-label text-[10px] text-gold/60 mb-3 tracking-[0.5em]">MTs Wahdah Islamiyah · Bone Bolango</div>
-            <h1 className="font-display text-gold-gradient font-black" style={{ fontSize: 'clamp(2.2rem, 10vw, 6rem)', lineHeight: 0.9 }}>ANGKATAN</h1>
-            <h1 className="font-display text-cream font-black mb-6" style={{ fontSize: 'clamp(2.2rem, 10vw, 6rem)', lineHeight: 0.9 }}>2026</h1>
-            <div className="flex items-center gap-4 mb-2 text-gold/60">
-              <div className="w-12 h-px bg-gradient-to-r from-transparent to-gold/50" />
-              <span className="font-heading text-xs tracking-widest uppercase">Neutrino</span>
-              <div className="w-12 h-px bg-gradient-to-l from-transparent to-gold/50" />
-            </div>
-            <p className="text-cream/40 font-body text-xs mb-10">2023 – 2026</p>
-            <button
-              onClick={() => isFullyReady && handleSplashEnter(true)}
-              disabled={!isFullyReady}
-              className={`text-xs tracking-widest px-8 py-3 transition-all ${
-                isFullyReady ? 'btn-gold hover:scale-105 hover:shadow-[0_0_30px_rgba(201,162,39,0.5)]' : 'card-dark text-cream/40 cursor-wait border border-gold/20'
-              }`}
-            >
-              {isFullyReady ? 'Masuk →' : 'Memuat...'}
-            </button>
+          {/* ── Garis ornamen horizontal atas & bawah */}
+          <div className="absolute top-[12%] left-0 right-0 flex items-center px-8 pointer-events-none">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gold/20 to-transparent splash-line" />
           </div>
+          <div className="absolute bottom-[12%] left-0 right-0 flex items-center px-8 pointer-events-none">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gold/15 to-transparent splash-line" />
+          </div>
+
+          {/* ── Konten utama */}
+          <div className={`relative z-10 text-center px-6 flex flex-col items-center transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+
+            {/* ── Logo block dengan loading ring */}
+            <div className="relative mb-8 flex items-center justify-center">
+
+              {/* Shockwave ring — muncul sekejap saat transisi loading→ready */}
+              {showShockwave && (
+                <div
+                  className="absolute rounded-full border border-gold/70 splash-shockwave"
+                  style={{ width: 112, height: 112 }}
+                />
+              )}
+
+              {/* Ring loading berputar — hanya saat belum ready */}
+              {!isFullyReady && (
+                <>
+                  {/* Ring luar berputar */}
+                  <div
+                    className="absolute rounded-full splash-spin-ring"
+                    style={{
+                      width: 116, height: 116,
+                      border: '2px solid transparent',
+                      borderTopColor: 'rgba(201,162,39,0.8)',
+                      borderRightColor: 'rgba(201,162,39,0.2)',
+                    }}
+                  />
+                  {/* Ring dalam, arah berlawanan, lebih lambat */}
+                  <div
+                    className="absolute rounded-full"
+                    style={{
+                      width: 100, height: 100,
+                      border: '1.5px solid transparent',
+                      borderBottomColor: 'rgba(240,192,64,0.5)',
+                      animation: 'spinRing 2.4s linear infinite reverse',
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Logo / placeholder */}
+              {neutrinoLogo ? (
+                <div
+                  className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center p-2 border-2 transition-all duration-300 ${
+                    isFullyReady
+                      ? 'border-gold/60 splash-logo-pop splash-glow-burst'
+                      : 'border-gold/25 bg-charcoal-dark/60'
+                  }`}
+                  style={{ background: isFullyReady ? 'rgba(28,16,4,0.7)' : 'rgba(28,16,4,0.5)' }}
+                >
+                  {/* Internal spiral spinner when not ready */}
+                  {!logoReady && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 border-2 border-transparent border-t-gold/80 border-b-gold/80 rounded-full animate-spin" />
+                      <div className="absolute w-4 h-4 sm:w-5 sm:h-5 border-2 border-transparent border-l-gold/60 border-r-gold/60 rounded-full" style={{ animation: 'spinRing 1.2s linear infinite reverse' }} />
+                    </div>
+                  )}
+
+                  <img
+                    src={neutrinoLogo}
+                    alt="Logo Neutrino"
+                    className={`w-full h-full object-contain transition-all duration-500 ${
+                      logoReady ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                    }`}
+                    onLoad={() => setLogoReady(true)}
+                    onError={() => setLogoReady(true)}
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex flex-col items-center justify-center transition-all duration-300 ${
+                    isFullyReady
+                      ? 'border-gold/70 splash-logo-pop splash-glow-burst'
+                      : 'border-gold/30 splash-logo-pulse'
+                  }`}
+                  style={{ background: 'rgba(28,16,4,0.9)' }}
+                >
+                  <span className="text-gold font-heading font-bold text-3xl leading-none">16</span>
+                  <span className="text-gold/50 font-heading text-[9px] tracking-[0.3em] mt-0.5">XVI</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Status loading kecil di bawah logo */}
+            <div className={`mb-6 transition-all duration-500 ${isFullyReady ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`} style={{ minHeight: 16 }}>
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-1 rounded-full bg-gold/40 animate-pulse" style={{ animationDelay: '0ms' }} />
+                <div className="w-1 h-1 rounded-full bg-gold/40 animate-pulse" style={{ animationDelay: '200ms' }} />
+                <div className="w-1 h-1 rounded-full bg-gold/40 animate-pulse" style={{ animationDelay: '400ms' }} />
+              </div>
+            </div>
+
+            {/* ── Label sekolah */}
+            <div className="splash-text-1">
+              <div className="section-label text-[10px] text-gold/55 mb-4 tracking-[0.5em]">
+                MTs Wahdah Islamiyah · Bone Bolango
+              </div>
+            </div>
+
+            {/* ── Judul utama */}
+            <div className="splash-text-2 overflow-hidden">
+              <h1
+                className="font-display text-gold-gradient font-black leading-[0.88]"
+                style={{ fontSize: 'clamp(2.4rem, 11vw, 6.5rem)' }}
+              >
+                ANGKATAN
+              </h1>
+            </div>
+            <div className="splash-text-3 overflow-hidden mb-5">
+              <h1
+                className="font-display text-cream font-black leading-[0.88]"
+                style={{ fontSize: 'clamp(2.4rem, 11vw, 6.5rem)' }}
+              >
+                2026
+              </h1>
+            </div>
+
+            {/* ── Ornamen tengah */}
+            <div className="splash-text-4 flex items-center gap-4 mb-2 w-full max-w-[280px]">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent to-gold/40 splash-line" />
+              <span className="font-heading text-[10px] text-gold/70 tracking-[0.35em] uppercase shrink-0">Neutrino</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent to-gold/40 splash-line" />
+            </div>
+
+            {/* ── Sub info */}
+            <div className="splash-text-5">
+              <p className="text-cream/35 font-body text-xs mb-8 tracking-widest">
+                Ikhwa · Putra · 2023 – 2026
+              </p>
+            </div>
+
+            {/* ── Tombol masuk */}
+            <div className="splash-text-6">
+              <button
+                onClick={() => isFullyReady && handleSplashEnter(true)}
+                disabled={!isFullyReady}
+                className={`relative text-xs tracking-[0.3em] px-10 py-3.5 transition-all duration-500 overflow-hidden ${
+                  isFullyReady
+                    ? 'btn-gold hover:scale-105 hover:shadow-[0_0_35px_rgba(201,162,39,0.55)]'
+                    : 'card-dark text-cream/30 cursor-wait border border-gold/15'
+                }`}
+              >
+                {isFullyReady ? 'MASUK →' : 'MEMUAT...'}
+              </button>
+            </div>
+
+          </div>
+
+          {/* ── Sudut ornamen (corner decorations) */}
+          <div className="absolute top-6 left-6 w-8 h-8 pointer-events-none opacity-30" style={{ borderTop: '1px solid #C9A227', borderLeft: '1px solid #C9A227' }} />
+          <div className="absolute top-6 right-6 w-8 h-8 pointer-events-none opacity-30" style={{ borderTop: '1px solid #C9A227', borderRight: '1px solid #C9A227' }} />
+          <div className="absolute bottom-6 left-6 w-8 h-8 pointer-events-none opacity-30" style={{ borderBottom: '1px solid #C9A227', borderLeft: '1px solid #C9A227' }} />
+          <div className="absolute bottom-6 right-6 w-8 h-8 pointer-events-none opacity-30" style={{ borderBottom: '1px solid #C9A227', borderRight: '1px solid #C9A227' }} />
+
         </div>
       )}
 

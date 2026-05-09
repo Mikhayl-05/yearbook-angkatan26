@@ -89,6 +89,11 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta property="og:title" content="Yearbook Angkatan 26 — MTS Wahdah Islamiyah Bonebolango" />
         <meta property="og:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Yearbook Angkatan 26" />
+        {/* Twitter Card — diperlukan agar WhatsApp & Twitter bisa baca og:image */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Yearbook Angkatan 26 — MTS Wahdah Islamiyah Bonebolango" />
+        <meta name="twitter:description" content="Kenangan digital Angkatan 26 — Neutrino MTS Pondok Pesantren Wahdah Islamiyah Bonebolango" />
         {/* Icons */}
         <link rel="icon" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />

@@ -1590,7 +1590,8 @@ function SettingsTab() {
       const oldUrl = getByKey(key);
       const ext = file.name.split('.').pop() || 'jpg';
       let url;
-      if (key === 'neutrino_bg_url' || key === 'neutrino_bg_mobile_url' || key === 'neutrino_logo_url') {
+      if (key === 'neutrino_bg_url' || key === 'neutrino_bg_mobile_url' || key === 'neutrino_logo_url' || key === 'og_image_url') {
+        // Simpan format ASLI (JPG/PNG) — diperlukan untuk OG image & background (bukan WebP)
         url = await uploadPhoto(file, `settings/${key}_${Date.now()}.${ext}`);
       } else {
         url = await uploadImage(file, `settings/${key}_${Date.now()}.${ext}`);
