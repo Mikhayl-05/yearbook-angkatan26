@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://yearbook-neutrino.vercel.app/sitemap.xml
